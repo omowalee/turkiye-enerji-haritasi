@@ -30,8 +30,8 @@ def main() -> int:
     a = ap.parse_args()
     root = a.root.resolve()
     skip = a.skip_export
-    if not skip and not (root / "data" / "raw").is_dir():
-        print(f"[bilgi] {root / 'data' / 'raw'} yok; dışa aktarma atlanıyor, sadece doğrulama yapılacak.")
+    if not skip and not (root / ".env").is_file():
+        print(f"[bilgi] {root / '.env'} yok (BigQuery kimliği yok); dışa aktarma atlanıyor, sadece doğrulama yapılacak.")
         skip = True
     py = [sys.executable, "-X", "utf8", "-m", "scripts.export_sample"]
     results: list[tuple[str, bool, str]] = []

@@ -1,4 +1,8 @@
-"""Sözleşme v0: BigQuery ham tablolarından frontend örnek JSON'larını üretir (dbt gelene kadar).
+"""Frontend örnek JSON'larını dbt mart'larından (BigQuery epias_marts) üretir ve şemayla doğrular.
+
+Okunan tablolar: mart_live_snapshot, agg_generation_by_source_hourly, fct_generation_hourly, dim_plants,
+agg_generation_by_province_hourly (epias_marts) ve il sınırları için stg_provinces (epias_staging).
+Eşleştirme, il ataması ve kurulu güç kuralı dbt'dedir; burada yalnızca biçimlendirme yapılır.
 
 Çalıştırma:  .venv/Scripts/python -X utf8 -m scripts.export_sample [--out DIR]
 Sadece doğrulama:  .venv/Scripts/python -X utf8 -m scripts.export_sample --validate-only [--out DIR]
@@ -7,293 +11,240 @@ Sadece doğrulama:  .venv/Scripts/python -X utf8 -m scripts.export_sample --vali
 import argparse
 import gzip
 import json
-import re
 import sys
-import unicodedata
 import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import pandas as pd
 from jsonschema import Draft202012Validator
-from rapidfuzz import fuzz, process
 from referencing import Registry, Resource
-from shapely import set_precision
-from shapely.geometry import Point, mapping, shape
-from shapely.strtree import STRtree
 
 warnings.filterwarnings("ignore", message="BigQuery Storage module not found")
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACTS = ROOT / "contracts"
 DEFAULT_OUT = ROOT / "frontend" / "public" / "data" / "sample"
-PROVINCES_SRC = ROOT / "data/raw/geoboundaries_tur_adm1_simplified.geojson"
-GEM_SRC = ROOT / "data/raw/gem/gem_turkiye.parquet"
-OSM_SRC = ROOT / "data/raw/osm/plants_2026-11-08.json"
+MARTS, STAGING = "epias_marts", "epias_staging"
+SIMPLIFY_M = 1000  # il sınırı sadeleştirme toleransı (m), ~0,01 derece
+COORD_DP = 3  # il sınırı koordinat ondalığı
 
 FILES = {  # dosya -> şema
     "snapshot_latest.json": "snapshot_latest", "plants.json": "plants", "generation_24h.json": "generation_24h",
     "mix_24h.json": "mix_24h", "provinces_24h.json": "provinces_24h", "provinces.geojson": "provinces", "source_labels.json": "source_labels",
 }
 VERSION = "0.1"
-THRESHOLD = 90
 
-# ---- Kaynak türü eşlemesi ----------------------------------------------------------------
-# Sıra, Türkçe etiket ve yenilenebilir bayrağı contracts/source_labels.json'dan gelir (tek kaynak).
+# Sıra ve etiketler contracts/source_labels.json'dan (dbt seed source_types ile birebir aynı).
 LABELS = json.loads((CONTRACTS / "source_labels.json").read_text(encoding="utf-8"))
 SOURCES = LABELS["order"]
-RENEWABLE = {k for k, v in LABELS["sources"].items() if v["renewable"]}
-SRC_MAP = {"sun": "solar", "wind": "wind", "dammedHydro": "hydro_dam", "river": "hydro_river",
-           "geothermal": "geothermal", "biomass": "biomass", "naturalGas": "natural_gas", "lng": "natural_gas",
-           "importCoal": "imported_coal", "lignite": "lignite", "blackCoal": "lignite",
-           "asphaltiteCoal": "lignite", "nuclear": "nuclear", "fueloil": "other", "naphta": "other",
-           "wasteheat": "other"}  # importExport ve total bilerek yok
 
 
-def src_of(col: str) -> str:
-    return SRC_MAP.get(col) or ("nuclear" if "nucl" in col.lower() else "diger")
+def iso(dt_local) -> str:
+    """Yerel (İstanbul) DATETIME -> sözleşme Timestamp."""
+    return dt_local.strftime("%Y-%m-%dT%H:%M:%S+03:00")
 
 
-# ---- Eşleştirme (scratch/kesif_eslesme.py mantığı) -------------------------------------
-FAMILY = {"naturalGas": "gas", "lng": "gas", "naphta": "gas", "fueloil": "gas", "dammedHydro": "hydro", "river": "hydro",
-          "lignite": "coal", "importCoal": "coal", "blackCoal": "coal", "asphaltiteCoal": "coal", "wind": "wind",
-          "sun": "solar", "geothermal": "geothermal", "biomass": "bio", "wasteheat": "bio"}
-GEM_FAMILY = {"oil/gas": "gas", "hydropower": "hydro", "coal": "coal", "utility-scale solar": "solar",
-              "wind": "wind", "geothermal": "geothermal", "bioenergy": "bio"}
-OSM_FAMILY = {"gas": "gas", "oil": "gas", "hydro": "hydro", "coal": "coal", "asphaltite": "coal", "solar": "solar",
-              "wind": "wind", "geothermal": "geothermal", "biogas": "bio", "biomass": "bio", "waste": "bio"}
-STOP = r"\b(HES|RES|GES|JES|BES|TES|DGKCS|DGKC|DGKÇS|DGKÇ|DGK|KCS|ENH|TERMIK|SANTRALI|SANTRAL|SANTRALİ|HIDROELEKTRIK|" \
-       r"BARAJI|BARAJ|VE|REGULATORU|REG|KOMBINE|CEVRIM|DOGALGAZ|DOGAL|GAZ|RUZGAR|GUNES|JEOTERMAL|ELEKTRIK|URETIM|" \
-       r"ENERJI|AS|A S|POWER|PLANT|STATION|WIND|FARM|SOLAR|HYDROELECTRIC|GEOTHERMAL|PROJECT|DAM|HPP|WPP|SPP|GPP|CCGT|" \
-       r"KOJEN|KOJENERASYON|BIYOKUTLE|BIYOGAZ|COP|GAZI|UNIT|PHASE|SANAYI|TIC|LTD|STI)\b"
-EIC_SUFFIX = r"-40W[0-9A-Z]{13}.*$"
+def nonzero(d: dict) -> dict:
+    """PerSource: yuvarlanınca sıfır olan kaynak yazılmaz; anahtarlar SOURCES sırasında."""
+    return {s: int(round(d[s])) for s in SOURCES if s in d and round(d[s]) != 0}
 
 
-def norm(s) -> str:
-    if not isinstance(s, str):
-        return ""
-    s = re.sub(EIC_SUFFIX, "", s).replace("İ", "I").replace("ı", "i").upper()
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
-    s = re.sub(STOP, " ", re.sub(r"[^A-Z0-9 ]", " ", s))
-    return re.sub(r"\s+", " ", s).strip()
+def series(rows, hours) -> dict:
+    """[(hour_tr, source_type, mw)] -> PerSourceSeries (tamamı sıfır olan kaynak atlanır)."""
+    idx = {h: i for i, h in enumerate(hours)}
+    out: dict[str, list[float]] = {}
+    for h, s, mw in rows:
+        out.setdefault(s, [0.0] * len(hours))[idx[h]] += mw
+    return {s: [int(round(v)) for v in out[s]] for s in SOURCES if s in out and any(round(v) for v in out[s])}
 
 
-def parse_mw(v) -> float | None:
-    m = re.match(r"^\s*([\d.]+)\s*(GW|MW|kW|W)\b", str(v), re.I)
-    if not m:
-        return None
-    return float(m[1]) * {"gw": 1000, "mw": 1, "kw": 1e-3, "w": 1e-6}[m[2].lower()]
+def ring_round(ring):
+    pts = []
+    for x, y in ring:
+        p = [round(x, COORD_DP), round(y, COORD_DP)]
+        if not pts or p != pts[-1]:
+            pts.append(p)
+    if pts and pts[0] != pts[-1]:
+        pts.append(pts[0])
+    return pts if len(pts) >= 4 else None
 
 
-def load_candidates():
-    """GEM (işletmede) ve OSM adaylarını (aile, anahtar, ref) olarak ve ref -> kayıt sözlükleriyle döndürür."""
-    gem = pd.read_parquet(GEM_SRC)
-    gem = gem[gem.Status == "operating"].groupby("Plant / Project name").agg(
-        typ=("Type", "first"), mw=("Capacity (MW)", "sum"), lat=("Latitude", "mean"), lon=("Longitude", "mean"),
-        local=("Plant / Project name (local)", "first"), other=("Plant / Project name (other)", "first")).reset_index()
-    recs = {"gem": {}, "osm": {}}
-    rows = {"gem": [], "osm": []}
-    for r in gem.itertuples():
-        recs["gem"][r[1]] = (r.lat, r.lon, r.mw if r.mw > 0 else None)
-        for nm in {r[1], r.local, r.other}:
-            if norm(nm):
-                rows["gem"].append((GEM_FAMILY.get(r.typ), norm(nm), r[1]))
-    for i, e in enumerate(json.load(open(OSM_SRC, encoding="utf-8"))["elements"]):
-        t = e.get("tags", {})
-        pos = e.get("center") or e
-        recs["osm"][i] = (pos.get("lat"), pos.get("lon"), parse_mw(t.get("plant:output:electricity")))
-        fam = OSM_FAMILY.get((t.get("plant:source") or "").split(";")[0])
-        for k in ("name", "name:tr", "alt_name", "operator"):
-            if norm(t.get(k)):
-                rows["osm"].append((fam, norm(t[k]), i))
-    cands = {k: pd.DataFrame(v, columns=["fam", "key", "ref"]) for k, v in rows.items()}
-    return cands, recs
+def polygons(g: dict) -> list:
+    """Polygon / MultiPolygon / GeometryCollection -> çokgen listesi (sadeleştirmede noktaya/çizgiye inen
+    küçük adalar atılır)."""
+    if g["type"] == "Polygon":
+        return [g["coordinates"]]
+    if g["type"] == "MultiPolygon":
+        return g["coordinates"]
+    if g["type"] == "GeometryCollection":
+        return [p for m in g["geometries"] for p in polygons(m)]
+    return []
 
 
-def best_match(key, fam, cands):
-    pool = cands[cands.fam == fam]
-    if not key or pool.empty:
-        return 0, None
-    m = process.extractOne(key, pool.key.tolist(), scorer=fuzz.token_set_ratio)
-    return int(round(m[1])), pool.iloc[m[2]].ref
+def geom_round(g: dict) -> dict:
+    """Koordinatları yuvarlar, ardışık tekrarları ve bozulan halkaları atar."""
+    polys = polygons(g)
+    out = []
+    for poly in polys:
+        rings = [r for r in (ring_round(r) for r in poly)]
+        if rings[0] is None:  # dış halka bozulduysa çokgen atlanır
+            continue
+        out.append([r for r in rings if r is not None])
+    return {"type": "Polygon", "coordinates": out[0]} if len(out) == 1 else {"type": "MultiPolygon", "coordinates": out}
 
 
-# ---- BigQuery ---------------------------------------------------------------------------
-def fuel_cols(c, table_id) -> list[str]:
-    return [f.name for f in c.get_table(table_id).schema
-            if f.field_type in ("FLOAT", "FLOAT64") and f.name not in ("total", "importExport")]
+def build(c, project: str):
+    billed = [0]
 
+    def q(sql: str) -> list:
+        job = c.query(sql.replace("{marts}", f"`{project}.{MARTS}").replace("{staging}", f"`{project}.{STAGING}"))
+        rows = list(job.result())
+        billed[0] += job.total_bytes_processed or 0
+        return rows
 
-def per_source(df, cols) -> pd.DataFrame:
-    """Yakıt kolonlarını kaynak türlerine toplar (NULL = 0); sütunlar SOURCES sırasında."""
-    out = {}
-    for col in cols:
-        out[src_of(col)] = out.get(src_of(col), 0) + df[col].fillna(0)
-    return pd.DataFrame(out, index=df.index)[[s for s in SOURCES if s in out]]
-
-
-def iso(t) -> str:
-    return (pd.Timestamp(t) + pd.Timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%S+03:00")
-
-
-def fetch(c, table_id):
-    q = lambda sql: c.query(sql).to_dataframe()
-    dd = lambda t, key, where: (f"(SELECT * FROM `{table_id(t)}` WHERE {where} "
-                                f"QUALIFY ROW_NUMBER() OVER (PARTITION BY {key} ORDER BY ingested_at DESC)=1)")
-    pcols, scols = fuel_cols(c, table_id("realtime_generation_plant")), fuel_cols(c, table_id("realtime_generation_source"))
-    day = str(q(f"SELECT date_local d FROM `{table_id('realtime_generation_plant')}` "
-                f"WHERE date_local >= DATE_SUB(CURRENT_DATE('Europe/Istanbul'), INTERVAL 7 DAY) "
-                f"GROUP BY d HAVING COUNT(DISTINCT ts)=24 ORDER BY d DESC LIMIT 1").d[0])
-    dt = f'DATE "{day}"'
-    sel = ", ".join(f"`{x}`" for x in pcols)
-    plant_day = q(f"SELECT ts, pp_id, {sel} FROM {dd('realtime_generation_plant', 'ts, pp_id', f'date_local = {dt}')}")
-    sums = ", ".join(f"SUM(`{x}`) `{x}`" for x in pcols)
-    plant_30 = q(f"SELECT pp_id, ARRAY_AGG(power_plant_name IGNORE NULLS ORDER BY ts DESC LIMIT 1)[SAFE_OFFSET(0)] name, {sums} "
-                 f"FROM {dd('realtime_generation_plant', 'ts, pp_id', f'date_local BETWEEN DATE_SUB({dt}, INTERVAL 29 DAY) AND {dt}')} GROUP BY pp_id")
-    sel = ", ".join(f"`{x}`" for x in scols)
-    src = q(f"SELECT ts, {sel} FROM {dd('realtime_generation_source', 'ts', f'date_local >= DATE_SUB({dt}, INTERVAL 1 DAY)')} ORDER BY ts")
-    price = q(f"SELECT ts, price FROM {dd('market_clearing_price', 'ts', f'date_local >= DATE_SUB({dt}, INTERVAL 1 DAY)')}")
-    unl = q(f"SELECT ts, gunes FROM {dd('unlicensed_generation', 'ts', "date_local >= DATE_SUB(CURRENT_DATE('Europe/Istanbul'), INTERVAL 120 DAY)")} ORDER BY ts")
-    return day, pcols, scols, plant_day, plant_30, src, price, unl
-
-
-# ---- Üretim -------------------------------------------------------------------------------
-def int_series(ps, mask=None) -> dict:
-    """PerSourceSeries: tamsayı diziler; tamamı sıfır olan kaynak atlanır."""
-    ps = ps if mask is None else ps[mask]
-    return {s: ps[s].round().astype(int).tolist() for s in ps.columns if ps[s].round().abs().sum() > 0}
-
-
-def provinces_geo():
-    feats = json.load(open(PROVINCES_SRC, encoding="utf-8"))["features"]
-    return [(int(f["properties"]["shapeISO"][3:]), f["properties"]["shapeName"], f["properties"]["shapeISO"],
-             shape(f["geometry"])) for f in feats]
-
-
-def round_coords(x):
-    return round(x, 3) if isinstance(x, float) else [round_coords(i) for i in x] if isinstance(x, (list, tuple)) else x
-
-
-def build(c, table_id):
-    day, pcols, scols, plant_day, plant_30, src, price, unl = fetch(c, table_id)
     now = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%dT%H:%M:%S+03:00")
     head = {"schema_version": VERSION, "generated_at": now}
-    prov = provinces_geo()
-    hours = [iso(pd.Timestamp(day, tz="UTC") - pd.Timedelta(hours=3) + pd.Timedelta(hours=h)) for h in range(24)]
 
-    # kaynak tablosu (ülke) ------------------------------------------------------------
-    sps = per_source(src, scols)
-    src_local = (src.ts + pd.Timedelta(hours=3)).dt.strftime("%Y-%m-%d")
-    ptf = price.assign(k=price.ts.map(iso)).set_index("k").price
-    ptf_list = lambda ts: [None if pd.isna(v := ptf.get(iso(t))) else round(float(v), 2) for t in ts]
-    last = len(src) - 2  # en yeni saat ön veri (sonradan yukarı revize edilir); live = bir önceki, kesinleşmiş saat
-    mw = sps.iloc[last].round().astype(int)
-    total = int(round(sps.iloc[last].sum()))
-    live = {"ts": iso(src.ts[last]), "total_mw": total,
-            "renewable_share_pct": round(100 * sps.iloc[last][[s for s in sps if s in RENEWABLE]].sum() / sps.iloc[last].sum(), 1),
-            "by_source": {s: {"mw": int(mw[s]), "akkuyu": round(int(mw[s]) / 1200, 2)} for s in sps.columns},
-            "ptf_tl_mwh": ptf_list([src.ts[last]])[0],
-            "provisional": {"ts": iso(src.ts.iloc[-1]), "total_mw": int(round(sps.iloc[-1].sum()))}}
+    # anlık özet ---------------------------------------------------------------------------
+    s = q("select * from {marts}.mart_live_snapshot`")
+    assert len(s) == 1, f"mart_live_snapshot {len(s)} satır"
+    s = s[0]
+    day = s.plants_day_date_tr
+    day_start = datetime.combine(day, datetime.min.time())
+    hours_tr = [day_start + timedelta(hours=h) for h in range(24)]
+    hours = [iso(h) for h in hours_tr]
+    # santral günü, bölüm budaması için UTC aralığıyla da filtrelenir (yerel gün = UTC -3 saat)
+    day_filter = (f"date_tr = date '{day}' and hour_start_at_utc between "
+                  f"timestamp('{day} 00:00:00', 'Europe/Istanbul') and timestamp('{day} 23:00:00', 'Europe/Istanbul')")
+    live_mw = {b["source_type"]: b["generation_mw"] for b in s.live_by_source}
+    live_by_source = nonzero(live_mw)
+    snapshot = {
+        **head,
+        "live": {
+            "ts": iso(s.live_hour_start_tr),
+            "total_mw": int(round(s.live_total_mw)),
+            "renewable_share_pct": round(s.live_renewable_share_pct, 1),
+            "by_source": {k: {"mw": v, "akkuyu": round(v / 1200, 2)} for k, v in live_by_source.items()},
+            "ptf_tl_mwh": None if s.live_price_try_per_mwh is None else round(float(s.live_price_try_per_mwh), 2),
+            "provisional": {"ts": iso(s.provisional_hour_start_tr), "total_mw": int(round(s.provisional_total_mw))},
+        },
+        "plants_day": {"date": str(day), "last_hour_ts": iso(s.plants_day_last_hour_start_tr),
+                       "total_mw_last_hour": int(round(s.plants_day_total_mw_last_hour)),
+                       "plant_count": int(s.plants_day_plant_count)},
+        "unlicensed_solar": {"month": s.unlicensed_solar_month.strftime("%Y-%m"),
+                             "avg_mw": int(round(s.unlicensed_solar_avg_mw)),
+                             "peak_mw": int(round(s.unlicensed_solar_peak_mw)), "source": "ren-ul-gen"},
+        "akkuyu_unit_mw": 1200,
+    }
 
-    # santral günü -------------------------------------------------------------------------
-    plant_day["h"] = (plant_day.ts + pd.Timedelta(hours=3)).dt.hour
-    pds = per_source(plant_day, pcols)
-    plant_day["mw"] = pds.sum(axis=1)
-    M = plant_day.pivot_table(index="pp_id", columns="h", values="mw", aggfunc="sum", fill_value=0).reindex(columns=range(24), fill_value=0)
-    S = pds.groupby(plant_day.pp_id).sum()
-    M = M[M.sum(axis=1) > 0].sort_index()
-    S = S.loc[M.index]
-    country_total = float(M.values.sum())
+    # santral boyutu ---------------------------------------------------------------------------
+    # Son 30 tam günde sıfırdan farklı üretimi olan santraller (baskın kaynağı belli olanlar).
+    plants = [{
+        "id": int(r.plant_id), "name": r.plant_name, "source": r.source_type,
+        "lat": None if r.latitude is None else round(r.latitude, 4),
+        "lon": None if r.longitude is None else round(r.longitude, 4),
+        "province": r.plate_code,
+        "capacity_mw": None if r.installed_capacity_mw is None else round(r.installed_capacity_mw, 1),
+        "match": {"source": r.location_source if r.is_located else None,
+                  "score": 0 if r.match_confidence is None else int(round(100 * r.match_confidence))},
+    } for r in q("""
+        select plant_id, plant_name, source_type, latitude, longitude, plate_code, installed_capacity_mw,
+               location_source, is_located, match_confidence
+        from {marts}.dim_plants`
+        where source_type is not null
+        order by plant_id""")]
+    plant_by_id = {p["id"]: p for p in plants}
 
-    # santral boyutu ------------------------------------------------------------------------
-    p30 = plant_30.set_index("pp_id")
-    p30 = p30[per_source(p30, pcols).sum(axis=1) > 0].sort_index()
-    ps30 = per_source(p30, pcols)
-    cands, recs = load_candidates()
-    polys = [p[3] for p in prov]
-    tree = STRtree(polys)
-    plants, near = [], 0
-    for pid, r in p30.iterrows():
-        name = re.sub(EIC_SUFFIX, "", r["name"] if isinstance(r["name"], str) else "").strip() or f"Santral {pid}"
-        fam = FAMILY.get(r[pcols].fillna(0).astype(float).idxmax())
-        sc = {k: best_match(norm(name), fam, cands[k]) for k in ("gem", "osm")}
-        k = "gem" if sc["gem"][0] >= sc["osm"][0] else "osm"
-        lat = lon = cap = prov_no = None
-        if sc[k][0] >= THRESHOLD:
-            la, lo, cap = recs[k][sc[k][1]]
-            cap = None if cap is None or pd.isna(cap) else round(float(cap), 1)
-            if la is not None and not pd.isna(la):
-                lat, lon = round(float(la), 4), round(float(lo), 4)
-                pt = Point(lon, lat)
-                hit = tree.query(pt, predicate="intersects")
-                if not len(hit):  # kıyıda, sadeleştirilmiş sınırın dışında kalan nokta: en yakın il (<0.1°)
-                    n = int(tree.nearest(pt))
-                    hit, near = ([n], near + 1) if polys[n].distance(pt) < 0.1 else ([], near)
-                prov_no = prov[hit[0]][0] if len(hit) else None
-        ok = sc[k][0] >= THRESHOLD
-        plants.append({"id": int(pid), "name": name, "source": ps30.loc[pid].idxmax(), "lat": lat, "lon": lon,
-                       "province": prov_no, "capacity_mw": cap,
-                       "match": {"source": k if ok else None, "score": sc[k][0]}})
-    plate_of = {p["id"]: p["province"] for p in plants}
-    plate = pd.Series([plate_of.get(i) or 0 for i in M.index], index=M.index)
+    # santral günü (oynatma) ---------------------------------------------------------------------
+    gen: dict[int, list[float]] = {}
+    for r in q(f"""
+            select plant_id, hour_start_tr, generation_mw
+            from {{marts}}.fct_generation_hourly`
+            where {day_filter}"""):
+        gen.setdefault(r.plant_id, [0.0] * 24)[r.hour_start_tr.hour] += r.generation_mw
+    gen = {pid: v for pid, v in sorted(gen.items()) if sum(v) > 0}  # o gün üretimi > 0 olanlar
+    missing = [pid for pid in gen if pid not in plant_by_id]
+    assert not missing, f"generation_24h'te plants.json'da olmayan santral: {missing[:10]}"
+    generation = {**head, "date": str(day), "hours": hours, "plant_ids": list(gen),
+                  "mw": [[int(round(x)) for x in v] for v in gen.values()]}
 
-    # iller --------------------------------------------------------------------------------
-    PM, PS, cnt = M.groupby(plate).sum(), S.groupby(plate).sum(), plate.value_counts()
-    names = {p[0]: p[1] for p in prov}
-    rows = []
-    for pl in PM.index[PM.index > 0]:
-        rows.append({"plate": int(pl), "name": names[pl], "mw": PM.loc[pl].round().astype(int).tolist(),
-                     "mwh_by_source": {s: int(round(v)) for s, v in PS.loc[pl].items() if round(v) != 0},
-                     "total_mwh": int(round(PM.loc[pl].sum())), "share_pct": round(100 * PM.loc[pl].sum() / country_total, 1),
-                     "plant_count": int(cnt[pl])})
+    # kaynak karması -------------------------------------------------------------------------
+    live_end = s.live_hour_start_tr
+    live_hours_tr = [live_end - timedelta(hours=23 - i) for i in range(24)]
+    src = q(f"""
+        select hour_start_tr, source_type, generation_mw, price_try_per_mwh
+        from {{marts}}.agg_generation_by_source_hourly`
+        where hour_start_at_utc between timestamp_sub(timestamp '{s.live_hour_start_at_utc}', interval 23 hour)
+                                    and timestamp '{s.live_hour_start_at_utc}'
+           or ({day_filter})""")
+    ptf = {r.hour_start_tr: r.price_try_per_mwh for r in src}
+    ptf_list = lambda hs: [None if ptf.get(h) is None else round(float(ptf[h]), 2) for h in hs]
+    live_set, day_set = set(live_hours_tr), set(hours_tr)
+    mix_live = series([(r.hour_start_tr, r.source_type, r.generation_mw) for r in src if r.hour_start_tr in live_set], live_hours_tr)
+    mix_day = series([(r.hour_start_tr, r.source_type, r.generation_mw) for r in src if r.hour_start_tr in day_set], hours_tr)
+    mix = {**head, "sources": [x for x in SOURCES if x in mix_live or x in mix_day],
+           "live": {"hours": [iso(h) for h in live_hours_tr], "mw": mix_live, "ptf_tl_mwh": ptf_list(live_hours_tr)},
+           "plants_day": {"date": str(day), "hours": hours, "mw": mix_day, "ptf_tl_mwh": ptf_list(hours_tr)}}
+
+    # iller ------------------------------------------------------------------------------------
+    prov_mw: dict[int, list[float]] = {}  # 0 = konumsuz
+    prov_src: dict[int, dict[str, float]] = {}
+    names: dict[int, str] = {}
+    for r in q(f"""
+            select province_key, province_name, hour_start_tr, source_type, generation_mw
+            from {{marts}}.agg_generation_by_province_hourly`
+            where {day_filter}"""):
+        prov_mw.setdefault(r.province_key, [0.0] * 24)[r.hour_start_tr.hour] += r.generation_mw
+        d = prov_src.setdefault(r.province_key, {})
+        d[r.source_type] = d.get(r.source_type, 0.0) + r.generation_mw
+        if r.province_name:
+            names[r.province_key] = r.province_name
+    cnt = {r.province_key: r.n for r in q(f"""
+            select coalesce(d.plate_code, 0) as province_key, count(*) as n
+            from (select plant_id from {{marts}}.fct_generation_hourly` where {day_filter}
+                  group by plant_id having sum(generation_mw) > 0) as f
+            left join {{marts}}.dim_plants` as d using (plant_id)
+            group by 1""")}
+    country_total = sum(sum(v) for v in prov_mw.values())
+    rows = [{"plate": int(k), "name": names[k], "mw": [int(round(x)) for x in v],
+             "mwh_by_source": nonzero(prov_src[k]), "total_mwh": int(round(sum(v))),
+             "share_pct": round(100 * sum(v) / country_total, 1), "plant_count": int(cnt.get(k, 0))}
+            for k, v in prov_mw.items() if k != 0]
     rows.sort(key=lambda r: -r["total_mwh"])
     for i, r in enumerate(rows, 1):
         r["rank"] = i
-    un = PM.loc[0] if 0 in PM.index else pd.Series([0.0] * 24)
-    unloc = {"mw": un.round().astype(int).tolist(), "total_mwh": int(round(un.sum())), "plant_count": int(cnt.get(0, 0))}
+    un = prov_mw.get(0, [0.0] * 24)
+    unloc = {"mw": [int(round(x)) for x in un], "total_mwh": int(round(sum(un))), "plant_count": int(cnt.get(0, 0))}
+    provinces_24h = {**head, "date": str(day), "hours": hours, "provinces": rows, "unlocated": unloc}
 
-    # lisanssız güneş ----------------------------------------------------------------------
-    unl["m"] = (unl.ts + pd.Timedelta(hours=3)).dt.strftime("%Y-%m")
-    um = unl[unl.m == unl.m.max()].fillna(0)
-    hod = um.groupby((um.ts + pd.Timedelta(hours=3)).dt.hour).gunes.mean()
-
-    # kaynak karması -----------------------------------------------------------------------
-    lv, lh = sps.iloc[last - 23:last + 1], src.ts.iloc[last - 23:last + 1]
-    dm = (src_local == day).to_numpy()
-    mix_live, mix_day = int_series(lv), int_series(sps, dm)
-    mix = {**head, "sources": [s for s in SOURCES if s in mix_live or s in mix_day],
-           "live": {"hours": [iso(t) for t in lh], "mw": mix_live, "ptf_tl_mwh": ptf_list(lh)},
-           "plants_day": {"date": day, "hours": [iso(t) for t in src.ts[dm]], "mw": mix_day, "ptf_tl_mwh": ptf_list(src.ts[dm])}}
-
-    feats = []
-    for plate_no, name, isocode, geom in prov:
-        g = mapping(set_precision(geom.simplify(0.01, preserve_topology=True), 0.001))
-        feats.append({"type": "Feature", "properties": {"plate": plate_no, "name": name, "iso": isocode},
-                      "geometry": {"type": g["type"], "coordinates": round_coords(g["coordinates"])}})
-    feats.sort(key=lambda f: f["properties"]["plate"])
+    # il sınırları -------------------------------------------------------------------------------
+    feats = [{"type": "Feature", "properties": {"plate": int(r.plate_code), "name": r.province_name, "iso": r.iso_code},
+              "geometry": geom_round(json.loads(r.g))}
+             for r in q(f"""
+                select plate_code, province_name, iso_code, st_asgeojson(st_simplify(geom, {SIMPLIFY_M})) as g
+                from {{staging}}.stg_provinces`
+                order by plate_code""")]
 
     docs = {
-        "snapshot_latest.json": {**head, "live": live,
-            "plants_day": {"date": day, "last_hour_ts": hours[-1], "total_mw_last_hour": int(round(M[23].sum())), "plant_count": len(M)},
-            "unlicensed_solar": {"month": um.m.iloc[0], "avg_mw": int(round(um.gunes.mean())), "peak_mw": int(round(hod.max())), "source": "ren-ul-gen"},
-            "akkuyu_unit_mw": 1200},
+        "snapshot_latest.json": snapshot,
         "plants.json": {**head, "plants": plants},
-        "generation_24h.json": {**head, "date": day, "hours": hours, "plant_ids": [int(i) for i in M.index],
-                                "mw": M.round().astype(int).values.tolist()},
+        "generation_24h.json": generation,
         "mix_24h.json": mix,
-        "provinces_24h.json": {**head, "date": day, "hours": hours, "provinces": rows, "unlocated": unloc},
+        "provinces_24h.json": provinces_24h,
         "provinces.geojson": {"schema_version": VERSION, "type": "FeatureCollection", "features": feats},
         "source_labels.json": LABELS,
     }
-    matched = [p for p in plants if p["match"]["source"]]
-    tot = M.sum(axis=1)
-    msum = tot[[p["id"] for p in matched if p["id"] in tot.index]].sum()
-    notes = [f"santral tarihi {day}; 30 günde üreten santral {len(plants)}, gün içinde {len(M)}",
-             f"eşleşen santral {len(matched)}/{len(plants)} ({sum(p['match']['source'] == 'gem' for p in matched)} GEM, "
-             f"{sum(p['match']['source'] == 'osm' for p in matched)} OSM); il atanan {sum(p['province'] is not None for p in plants)}; "
-             f"en yakın il yedeği {near}",
-             f"son santral gününde eşleşen üretim payı %{100 * msum / country_total:.1f}; ile atanamayan %{100 * unloc['total_mwh'] / country_total:.1f}",
-             f"santral günü toplamı {country_total:,.0f} MWh; kaynak tablosu aynı gün {sps[dm].sum().sum():,.0f} MWh"]
+    located = [p for p in plants if p["lat"] is not None]
+    day_total = sum(sum(v) for v in gen.values())
+    day_located = sum(sum(v) for pid, v in gen.items() if plant_by_id[pid]["lat"] is not None)
+    mix_day_total = sum(sum(v) for v in mix_day.values())
+    notes = [f"live {snapshot['live']['ts']} ({snapshot['live']['total_mw']:,} MW), ön veri {snapshot['live']['provisional']['ts']}",
+             f"santral günü {day}; plants.json {len(plants)} santral, gün içinde üreten {len(gen)}",
+             f"konumlu santral {len(located)}/{len(plants)} ({sum(p['match']['source'] == 'gem' for p in located)} GEM, "
+             f"{sum(p['match']['source'] == 'osm' for p in located)} OSM); kurulu gücü dolu {sum(p['capacity_mw'] is not None for p in located)}",
+             f"santral gününde konumlu üretim payı %{100 * day_located / day_total:.2f}; ili bilinmeyen (unlocated) %{100 * unloc['total_mwh'] / country_total:.2f}",
+             f"santral günü toplamı {day_total:,.0f} MWh; kaynak tablosu aynı gün {mix_day_total:,.0f} MWh",
+             f"BigQuery taranan: {billed[0] / 2**20:.1f} MiB"]
     return docs, notes
 
 
@@ -331,8 +282,9 @@ def main() -> int:
             ok = False
         return 0 if ok else 1
     sys.path.insert(0, str(ROOT))
-    from pipeline.bq.client import get_client, table_id
-    docs, notes = build(get_client(), table_id)
+    from pipeline.bq.client import get_client
+    from pipeline.config import GCP_PROJECT_ID
+    docs, notes = build(get_client(), GCP_PROJECT_ID)
     if not validate(docs):
         print("Şemaya uymayan çıktı var, dosyalar YAZILMADI.")
         return 1
