@@ -1,0 +1,25 @@
+# Airflow saatlik DAG'ı için iki yol. Üst modeller (+) kasıtlı olarak yok: ağır tablolar (eşleştirme, profil)
+# günlük DAG'da yenilenir. Ortak: mart_live_snapshot (iki yolda da yeniden kurulur).
+selectors:
+  - name: country
+    description: Ülke yolu (saatlik) - kaynak, PTF, tüketim, dış ticaret, ülke mart'ları, anlık özet
+    definition:
+      union:
+        - stg_epias__generation_by_source
+        - stg_epias__market_clearing_price
+        - stg_epias__consumption
+        - stg_epias__net_import
+        - agg_generation_by_source_hourly
+        - agg_country_balance_hourly
+        - mart_live_snapshot
+  - name: plant
+    description: Santral yolu (yeni santral günü gelince) - santral staging, zenginleştirme, fct, il, dim, anlık özet
+    definition:
+      union:
+        - stg_epias__generation_by_plant
+        - stg_epias__power_plants
+        - int_generation_enriched
+        - fct_generation_hourly
+        - agg_generation_by_province_hourly
+        - dim_plants
+        - mart_live_snapshot
