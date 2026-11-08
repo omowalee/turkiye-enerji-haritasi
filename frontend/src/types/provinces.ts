@@ -6,6 +6,10 @@
  * 81 il için sadeleştirilmiş GeoJSON FeatureCollection (geoBoundaries). Özellikler: plate, name, iso.
  */
 export interface Provinces {
+  /**
+   * Sözleşme sürümü (RFC 7946 yabancı üye).
+   */
+  schema_version: "0.1";
   type: "FeatureCollection";
   features: ProvinceFeature[];
 }

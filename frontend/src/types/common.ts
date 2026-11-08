@@ -9,19 +9,19 @@
  * via the `definition` "SourceType".
  */
 export type SourceType =
-  | "gunes"
-  | "ruzgar"
-  | "hidro_baraj"
-  | "hidro_akarsu"
-  | "jeotermal"
-  | "biyokutle"
-  | "dogalgaz"
-  | "ithal_komur"
-  | "yerli_komur"
-  | "nukleer"
-  | "diger";
+  | "solar"
+  | "wind"
+  | "hydro_dam"
+  | "hydro_river"
+  | "geothermal"
+  | "biomass"
+  | "natural_gas"
+  | "imported_coal"
+  | "lignite"
+  | "nuclear"
+  | "other";
 /**
- * Saat başı zaman damgası, Europe/Istanbul sabit +03:00. Örnek: 2026-11-07T23:00:00+03:00.
+ * ISO 8601 zaman damgası, +03:00 ofsetli: saatin başlangıcı (hour start), İstanbul saati. Örnek: 2026-11-07T23:00:00+03:00.
  *
  * This interface was referenced by `Common`'s JSON-Schema
  * via the `definition` "Timestamp".
@@ -56,17 +56,17 @@ export type Month = string;
  * via the `definition` "PerSource".
  */
 export interface PerSource {
-  gunes?: number;
-  ruzgar?: number;
-  hidro_baraj?: number;
-  hidro_akarsu?: number;
-  jeotermal?: number;
-  biyokutle?: number;
-  dogalgaz?: number;
-  ithal_komur?: number;
-  yerli_komur?: number;
-  nukleer?: number;
-  diger?: number;
+  solar?: number;
+  wind?: number;
+  hydro_dam?: number;
+  hydro_river?: number;
+  geothermal?: number;
+  biomass?: number;
+  natural_gas?: number;
+  imported_coal?: number;
+  lignite?: number;
+  nuclear?: number;
+  other?: number;
 }
 /**
  * Kaynak türü başına sayı dizisi (saatlik seri). Tamamı sıfır olan kaynak yazılmaz.
@@ -75,15 +75,15 @@ export interface PerSource {
  * via the `definition` "PerSourceSeries".
  */
 export interface PerSourceSeries {
-  gunes?: number[];
-  ruzgar?: number[];
-  hidro_baraj?: number[];
-  hidro_akarsu?: number[];
-  jeotermal?: number[];
-  biyokutle?: number[];
-  dogalgaz?: number[];
-  ithal_komur?: number[];
-  yerli_komur?: number[];
-  nukleer?: number[];
-  diger?: number[];
+  solar?: number[];
+  wind?: number[];
+  hydro_dam?: number[];
+  hydro_river?: number[];
+  geothermal?: number[];
+  biomass?: number[];
+  natural_gas?: number[];
+  imported_coal?: number[];
+  lignite?: number[];
+  nuclear?: number[];
+  other?: number[];
 }

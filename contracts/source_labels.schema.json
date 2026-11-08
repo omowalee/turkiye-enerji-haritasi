@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/source_labels.schema.json",
+  "title": "Kaynak etiketleri",
+  "description": "Kaynak anahtarı -> Türkçe etiket ve yenilenebilir bayrağı. order: gösterim ve yığılma sırası. Tek doğruluk kaynağı.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "order",
+    "sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1",
+      "description": "Sözleşme sürümü."
+    },
+    "order": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/SourceType"
+      },
+      "description": "Gösterim ve yığılma sırası."
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "solar",
+        "wind",
+        "hydro_dam",
+        "hydro_river",
+        "geothermal",
+        "biomass",
+        "natural_gas",
+        "imported_coal",
+        "lignite",
+        "nuclear",
+        "other"
+      ],
+      "properties": {
+        "solar": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "wind": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "hydro_dam": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "hydro_river": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "geothermal": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "biomass": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "natural_gas": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "imported_coal": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "lignite": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "nuclear": {
+          "$ref": "#/$defs/SourceLabel"
+        },
+        "other": {
+          "$ref": "#/$defs/SourceLabel"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "SourceLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "renewable"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Türkçe etiket."
+        },
+        "renewable": {
+          "type": "boolean",
+          "description": "Yenilenebilir mi."
+        }
+      }
+    }
+  }
+}

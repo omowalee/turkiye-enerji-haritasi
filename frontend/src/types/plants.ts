@@ -11,7 +11,7 @@ export interface Plants {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1.0";
+  schema_version: "0.1";
   /**
    * Dosyanın üretildiği an (+03:00).
    */

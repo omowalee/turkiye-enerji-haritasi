@@ -12,7 +12,7 @@ export interface Mix24H {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1.0";
+  schema_version: "0.1";
   /**
    * Dosyanın üretildiği an (+03:00).
    */
@@ -26,7 +26,7 @@ export interface Mix24H {
 }
 export interface MixLive {
   /**
-   * Son 24 mevcut saat.
+   * Son 24 kesinleşmiş saat; saatin başlangıcı (hour start), İstanbul saati. Son eleman live.ts ile aynıdır.
    *
    * @minItems 24
    * @maxItems 24
@@ -66,7 +66,7 @@ export interface MixPlantsDay {
    */
   date: LocalDate;
   /**
-   * Günün 24 saat başı.
+   * Günün 24 saati; her değer saatin başlangıcı (hour start), İstanbul saati.
    *
    * @minItems 24
    * @maxItems 24

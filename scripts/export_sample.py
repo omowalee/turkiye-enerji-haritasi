@@ -33,24 +33,25 @@ OSM_SRC = ROOT / "data/raw/osm/plants_2026-11-08.json"
 
 FILES = {  # dosya -> şema
     "snapshot_latest.json": "snapshot_latest", "plants.json": "plants", "generation_24h.json": "generation_24h",
-    "mix_24h.json": "mix_24h", "provinces_24h.json": "provinces_24h", "provinces.geojson": "provinces",
+    "mix_24h.json": "mix_24h", "provinces_24h.json": "provinces_24h", "provinces.geojson": "provinces", "source_labels.json": "source_labels",
 }
-VERSION = "0.1.0"
+VERSION = "0.1"
 THRESHOLD = 90
 
-# ---- Kaynak türü eşlemesi: TEK yer ----------------------------------------------------
-SOURCES = ["gunes", "ruzgar", "hidro_baraj", "hidro_akarsu", "jeotermal", "biyokutle", "dogalgaz",
-           "ithal_komur", "yerli_komur", "nukleer", "diger"]
-RENEWABLE = {"gunes", "ruzgar", "hidro_baraj", "hidro_akarsu", "jeotermal", "biyokutle"}
-SRC_MAP = {"sun": "gunes", "wind": "ruzgar", "dammedHydro": "hidro_baraj", "river": "hidro_akarsu",
-           "geothermal": "jeotermal", "biomass": "biyokutle", "naturalGas": "dogalgaz", "lng": "dogalgaz",
-           "importCoal": "ithal_komur", "lignite": "yerli_komur", "blackCoal": "yerli_komur",
-           "asphaltiteCoal": "yerli_komur", "nuclear": "nukleer", "fueloil": "diger", "naphta": "diger",
-           "wasteheat": "diger"}  # importExport ve total bilerek yok
+# ---- Kaynak türü eşlemesi ----------------------------------------------------------------
+# Sıra, Türkçe etiket ve yenilenebilir bayrağı contracts/source_labels.json'dan gelir (tek kaynak).
+LABELS = json.loads((CONTRACTS / "source_labels.json").read_text(encoding="utf-8"))
+SOURCES = LABELS["order"]
+RENEWABLE = {k for k, v in LABELS["sources"].items() if v["renewable"]}
+SRC_MAP = {"sun": "solar", "wind": "wind", "dammedHydro": "hydro_dam", "river": "hydro_river",
+           "geothermal": "geothermal", "biomass": "biomass", "naturalGas": "natural_gas", "lng": "natural_gas",
+           "importCoal": "imported_coal", "lignite": "lignite", "blackCoal": "lignite",
+           "asphaltiteCoal": "lignite", "nuclear": "nuclear", "fueloil": "other", "naphta": "other",
+           "wasteheat": "other"}  # importExport ve total bilerek yok
 
 
 def src_of(col: str) -> str:
-    return SRC_MAP.get(col) or ("nukleer" if "nucl" in col.lower() else "diger")
+    return SRC_MAP.get(col) or ("nuclear" if "nucl" in col.lower() else "diger")
 
 
 # ---- Eşleştirme (scratch/kesif_eslesme.py mantığı) -------------------------------------
@@ -185,13 +186,14 @@ def build(c, table_id):
     src_local = (src.ts + pd.Timedelta(hours=3)).dt.strftime("%Y-%m-%d")
     ptf = price.assign(k=price.ts.map(iso)).set_index("k").price
     ptf_list = lambda ts: [None if pd.isna(v := ptf.get(iso(t))) else round(float(v), 2) for t in ts]
-    last = len(src) - 1
+    last = len(src) - 2  # en yeni saat ön veri (sonradan yukarı revize edilir); live = bir önceki, kesinleşmiş saat
     mw = sps.iloc[last].round().astype(int)
     total = int(round(sps.iloc[last].sum()))
     live = {"ts": iso(src.ts[last]), "total_mw": total,
             "renewable_share_pct": round(100 * sps.iloc[last][[s for s in sps if s in RENEWABLE]].sum() / sps.iloc[last].sum(), 1),
             "by_source": {s: {"mw": int(mw[s]), "akkuyu": round(int(mw[s]) / 1200, 2)} for s in sps.columns},
-            "ptf_tl_mwh": ptf_list([src.ts[last]])[0]}
+            "ptf_tl_mwh": ptf_list([src.ts[last]])[0],
+            "provisional": {"ts": iso(src.ts.iloc[-1]), "total_mw": int(round(sps.iloc[-1].sum()))}}
 
     # santral günü -------------------------------------------------------------------------
     plant_day["h"] = (plant_day.ts + pd.Timedelta(hours=3)).dt.hour
@@ -256,11 +258,11 @@ def build(c, table_id):
     hod = um.groupby((um.ts + pd.Timedelta(hours=3)).dt.hour).gunes.mean()
 
     # kaynak karması -----------------------------------------------------------------------
-    lv = sps.iloc[-24:]
+    lv, lh = sps.iloc[last - 23:last + 1], src.ts.iloc[last - 23:last + 1]
     dm = (src_local == day).to_numpy()
     mix_live, mix_day = int_series(lv), int_series(sps, dm)
     mix = {**head, "sources": [s for s in SOURCES if s in mix_live or s in mix_day],
-           "live": {"hours": [iso(t) for t in src.ts[-24:]], "mw": mix_live, "ptf_tl_mwh": ptf_list(src.ts[-24:])},
+           "live": {"hours": [iso(t) for t in lh], "mw": mix_live, "ptf_tl_mwh": ptf_list(lh)},
            "plants_day": {"date": day, "hours": [iso(t) for t in src.ts[dm]], "mw": mix_day, "ptf_tl_mwh": ptf_list(src.ts[dm])}}
 
     feats = []
@@ -280,7 +282,8 @@ def build(c, table_id):
                                 "mw": M.round().astype(int).values.tolist()},
         "mix_24h.json": mix,
         "provinces_24h.json": {**head, "date": day, "hours": hours, "provinces": rows, "unlocated": unloc},
-        "provinces.geojson": {"type": "FeatureCollection", "features": feats},
+        "provinces.geojson": {"schema_version": VERSION, "type": "FeatureCollection", "features": feats},
+        "source_labels.json": LABELS,
     }
     matched = [p for p in plants if p["match"]["source"]]
     tot = M.sum(axis=1)
@@ -322,7 +325,11 @@ def main() -> int:
     ap.add_argument("--validate-only", action="store_true")
     a = ap.parse_args()
     if a.validate_only:
-        return 0 if validate({f: json.loads((a.out / f).read_text(encoding="utf-8")) for f in FILES}) else 1
+        ok = validate({f: json.loads((a.out / f).read_text(encoding="utf-8")) for f in FILES})
+        if (a.out / "source_labels.json").read_bytes() != dump(LABELS):
+            print("HATA source_labels.json örneği contracts/ içindekiyle aynı değil (yeniden dışa aktar)")
+            ok = False
+        return 0 if ok else 1
     sys.path.insert(0, str(ROOT))
     from pipeline.bq.client import get_client, table_id
     docs, notes = build(get_client(), table_id)

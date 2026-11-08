@@ -6,10 +6,15 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
     "type",
     "features"
   ],
   "properties": {
+    "schema_version": {
+      "const": "0.1",
+      "description": "Sözleşme sürümü (RFC 7946 yabancı üye)."
+    },
     "type": {
       "const": "FeatureCollection"
     },

@@ -11,7 +11,7 @@ export interface Generation24H {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1.0";
+  schema_version: "0.1";
   /**
    * Dosyanın üretildiği an (+03:00).
    */
@@ -21,7 +21,7 @@ export interface Generation24H {
    */
   date: LocalDate;
   /**
-   * Günün 24 saat başı.
+   * Günün 24 saati; her değer saatin başlangıcı (hour start), İstanbul saati.
    *
    * @minItems 24
    * @maxItems 24

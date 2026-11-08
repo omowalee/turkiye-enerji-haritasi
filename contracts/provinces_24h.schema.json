@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "0.1.0",
+      "const": "0.1",
       "description": "Sözleşme sürümü."
     },
     "generated_at": {
@@ -32,7 +32,7 @@
       },
       "minItems": 24,
       "maxItems": 24,
-      "description": "Günün 24 saat başı."
+      "description": "Günün 24 saati; her değer saatin başlangıcı (hour start), İstanbul saati."
     },
     "provinces": {
       "type": "array",

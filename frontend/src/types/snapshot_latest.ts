@@ -11,7 +11,7 @@ export interface SnapshotLatest {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1.0";
+  schema_version: "0.1";
   /**
    * Dosyanın üretildiği an (+03:00).
    */
@@ -25,15 +25,15 @@ export interface SnapshotLatest {
   akkuyu_unit_mw: 1200;
 }
 /**
- * Ülke kaynak bazlı veri, en son saat.
+ * Ülke kaynak bazlı veri, son KESİNLEŞMİŞ saat (en yeni saatten bir önceki; en yeni saat ön veridir ve sonradan yukarı revize edilir). Sadece lisanslı yurt içi üretim.
  */
 export interface SnapshotLive {
   /**
-   * En son mevcut saatin başlangıcı.
+   * Son kesinleşmiş saatin başlangıcı (hour start), İstanbul saati. Tüm live değerleri bu saate aittir.
    */
   ts: Timestamp;
   /**
-   * Lisanslı toplam MW (ithalat/ihracat hariç).
+   * Lisanslı yurt içi üretim, dış ticaret hariç (MW).
    */
   total_mw: number;
   /**
@@ -44,22 +44,23 @@ export interface SnapshotLive {
    * Sadece verisi bulunan kaynaklar.
    */
   by_source: {
-    gunes?: SourceMw;
-    ruzgar?: SourceMw;
-    hidro_baraj?: SourceMw;
-    hidro_akarsu?: SourceMw;
-    jeotermal?: SourceMw;
-    biyokutle?: SourceMw;
-    dogalgaz?: SourceMw;
-    ithal_komur?: SourceMw;
-    yerli_komur?: SourceMw;
-    nukleer?: SourceMw;
-    diger?: SourceMw;
+    solar?: SourceMw;
+    wind?: SourceMw;
+    hydro_dam?: SourceMw;
+    hydro_river?: SourceMw;
+    geothermal?: SourceMw;
+    biomass?: SourceMw;
+    natural_gas?: SourceMw;
+    imported_coal?: SourceMw;
+    lignite?: SourceMw;
+    nuclear?: SourceMw;
+    other?: SourceMw;
   };
   /**
-   * Aynı saat için PTF (TL/MWh); yoksa null.
+   * Aynı (kesinleşmiş) saat için PTF (TL/MWh); yoksa null.
    */
   ptf_tl_mwh: number | null;
+  provisional?: SnapshotProvisional;
 }
 export interface SourceMw {
   /**
@@ -72,6 +73,19 @@ export interface SourceMw {
   akkuyu: number;
 }
 /**
+ * Ön veri, panel şimdilik kullanmaz.
+ */
+export interface SnapshotProvisional {
+  /**
+   * En yeni (ön veri) saatin başlangıcı (hour start), İstanbul saati.
+   */
+  ts: Timestamp;
+  /**
+   * O saatin lisanslı yurt içi üretim toplamı, dış ticaret hariç (MW).
+   */
+  total_mw: number;
+}
+/**
  * Santral verisinin son tam günü (canlı modda harita bunu gösterir).
  */
 export interface SnapshotPlantsDay {
@@ -80,11 +94,11 @@ export interface SnapshotPlantsDay {
    */
   date: LocalDate;
   /**
-   * Günün son saati (T23:00).
+   * Günün son saatinin başlangıcı (T23:00), İstanbul saati.
    */
   last_hour_ts: Timestamp;
   /**
-   * Santral toplamı, son saat, MW.
+   * Santral toplamı, son saat, MW (lisanslı yurt içi üretim, dış ticaret hariç).
    */
   total_mw_last_hour: number;
   /**

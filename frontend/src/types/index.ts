@@ -9,3 +9,4 @@ export * from "./plants";
 export * from "./provinces";
 export * from "./provinces_24h";
 export * from "./snapshot_latest";
+export * from "./source_labels";

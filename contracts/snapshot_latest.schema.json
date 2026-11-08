@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "0.1.0",
+      "const": "0.1",
       "description": "Sözleşme sürümü."
     },
     "generated_at": {
@@ -56,7 +56,7 @@
       }
     },
     "SnapshotLive": {
-      "description": "Ülke kaynak bazlı veri, en son saat.",
+      "description": "Ülke kaynak bazlı veri, son KESİNLEŞMİŞ saat (en yeni saatten bir önceki; en yeni saat ön veridir ve sonradan yukarı revize edilir). Sadece lisanslı yurt içi üretim.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -69,11 +69,11 @@
       "properties": {
         "ts": {
           "$ref": "common.schema.json#/$defs/Timestamp",
-          "description": "En son mevcut saatin başlangıcı."
+          "description": "Son kesinleşmiş saatin başlangıcı (hour start), İstanbul saati. Tüm live değerleri bu saate aittir."
         },
         "total_mw": {
           "type": "integer",
-          "description": "Lisanslı toplam MW (ithalat/ihracat hariç)."
+          "description": "Lisanslı yurt içi üretim, dış ticaret hariç (MW)."
         },
         "renewable_share_pct": {
           "type": "number",
@@ -84,37 +84,37 @@
           "additionalProperties": false,
           "required": [],
           "properties": {
-            "gunes": {
+            "solar": {
               "$ref": "#/$defs/SourceMw"
             },
-            "ruzgar": {
+            "wind": {
               "$ref": "#/$defs/SourceMw"
             },
-            "hidro_baraj": {
+            "hydro_dam": {
               "$ref": "#/$defs/SourceMw"
             },
-            "hidro_akarsu": {
+            "hydro_river": {
               "$ref": "#/$defs/SourceMw"
             },
-            "jeotermal": {
+            "geothermal": {
               "$ref": "#/$defs/SourceMw"
             },
-            "biyokutle": {
+            "biomass": {
               "$ref": "#/$defs/SourceMw"
             },
-            "dogalgaz": {
+            "natural_gas": {
               "$ref": "#/$defs/SourceMw"
             },
-            "ithal_komur": {
+            "imported_coal": {
               "$ref": "#/$defs/SourceMw"
             },
-            "yerli_komur": {
+            "lignite": {
               "$ref": "#/$defs/SourceMw"
             },
-            "nukleer": {
+            "nuclear": {
               "$ref": "#/$defs/SourceMw"
             },
-            "diger": {
+            "other": {
               "$ref": "#/$defs/SourceMw"
             }
           },
@@ -125,7 +125,29 @@
             "number",
             "null"
           ],
-          "description": "Aynı saat için PTF (TL/MWh); yoksa null."
+          "description": "Aynı (kesinleşmiş) saat için PTF (TL/MWh); yoksa null."
+        },
+        "provisional": {
+          "$ref": "#/$defs/SnapshotProvisional"
+        }
+      }
+    },
+    "SnapshotProvisional": {
+      "description": "Ön veri, panel şimdilik kullanmaz.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "total_mw"
+      ],
+      "properties": {
+        "ts": {
+          "$ref": "common.schema.json#/$defs/Timestamp",
+          "description": "En yeni (ön veri) saatin başlangıcı (hour start), İstanbul saati."
+        },
+        "total_mw": {
+          "type": "integer",
+          "description": "O saatin lisanslı yurt içi üretim toplamı, dış ticaret hariç (MW)."
         }
       }
     },
@@ -145,11 +167,11 @@
         },
         "last_hour_ts": {
           "$ref": "common.schema.json#/$defs/Timestamp",
-          "description": "Günün son saati (T23:00)."
+          "description": "Günün son saatinin başlangıcı (T23:00), İstanbul saati."
         },
         "total_mw_last_hour": {
           "type": "integer",
-          "description": "Santral toplamı, son saat, MW."
+          "description": "Santral toplamı, son saat, MW (lisanslı yurt içi üretim, dış ticaret hariç)."
         },
         "plant_count": {
           "type": "integer",

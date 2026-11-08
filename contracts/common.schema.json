@@ -8,22 +8,22 @@
       "description": "Kaynak türü. Sıra, yığılma ve gösterim sırasıdır.",
       "type": "string",
       "enum": [
-        "gunes",
-        "ruzgar",
-        "hidro_baraj",
-        "hidro_akarsu",
-        "jeotermal",
-        "biyokutle",
-        "dogalgaz",
-        "ithal_komur",
-        "yerli_komur",
-        "nukleer",
-        "diger"
+        "solar",
+        "wind",
+        "hydro_dam",
+        "hydro_river",
+        "geothermal",
+        "biomass",
+        "natural_gas",
+        "imported_coal",
+        "lignite",
+        "nuclear",
+        "other"
       ],
       "tsType": "SourceType"
     },
     "Timestamp": {
-      "description": "Saat başı zaman damgası, Europe/Istanbul sabit +03:00. Örnek: 2026-11-07T23:00:00+03:00.",
+      "description": "ISO 8601 zaman damgası, +03:00 ofsetli: saatin başlangıcı (hour start), İstanbul saati. Örnek: 2026-11-07T23:00:00+03:00.",
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:00:00\\+03:00$",
       "tsType": "Timestamp"
@@ -51,37 +51,37 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "gunes": {
+        "solar": {
           "type": "number"
         },
-        "ruzgar": {
+        "wind": {
           "type": "number"
         },
-        "hidro_baraj": {
+        "hydro_dam": {
           "type": "number"
         },
-        "hidro_akarsu": {
+        "hydro_river": {
           "type": "number"
         },
-        "jeotermal": {
+        "geothermal": {
           "type": "number"
         },
-        "biyokutle": {
+        "biomass": {
           "type": "number"
         },
-        "dogalgaz": {
+        "natural_gas": {
           "type": "number"
         },
-        "ithal_komur": {
+        "imported_coal": {
           "type": "number"
         },
-        "yerli_komur": {
+        "lignite": {
           "type": "number"
         },
-        "nukleer": {
+        "nuclear": {
           "type": "number"
         },
-        "diger": {
+        "other": {
           "type": "number"
         }
       },
@@ -92,67 +92,67 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "gunes": {
+        "solar": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "ruzgar": {
+        "wind": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "hidro_baraj": {
+        "hydro_dam": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "hidro_akarsu": {
+        "hydro_river": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "jeotermal": {
+        "geothermal": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "biyokutle": {
+        "biomass": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "dogalgaz": {
+        "natural_gas": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "ithal_komur": {
+        "imported_coal": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "yerli_komur": {
+        "lignite": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "nukleer": {
+        "nuclear": {
           "type": "array",
           "items": {
             "type": "number"
           }
         },
-        "diger": {
+        "other": {
           "type": "array",
           "items": {
             "type": "number"
