@@ -120,3 +120,54 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [hour_start_at_utc, plant_id]
+
+  - name: agg_generation_by_source_hourly
+    description: >
+      Grain: bir satır = bir saat x bir source_type. Ülke verisi (rt-gen): lisanslı yurt içi üretim, dış
+      ticaret (importExport) ve EPİAŞ total'i hariç; toplam kaynak kolonlarından yeniden hesaplanır.
+      Saatin toplamı, yenilenebilir payı (seed source_types.is_renewable) ve aynı saatin PTF'si satıra
+      tekrarlanır. En yeni saat ön veridir (is_finalized = false). Canlı sayaçlar ve mix_24h buradan.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC.
+        data_tests: [not_null]
+      - name: hour_start_tr
+        description: Saatin BAŞLANGICI, İstanbul yerel saati (DATETIME).
+        data_tests: [not_null]
+      - name: date_tr
+        description: İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: source_type
+        description: Kontrollü kaynak türü.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['solar', 'wind', 'hydro_dam', 'hydro_river', 'natural_gas', 'imported_coal', 'lignite', 'geothermal', 'biomass', 'nuclear', 'other']
+      - name: is_renewable
+        description: Kaynak yenilenebilir mi (seed source_types; sözleşmedeki tanım).
+        data_tests: [not_null]
+      - name: generation_mw
+        description: O saatteki ortalama güç, MW (= saatlik MWh).
+        data_tests: [not_null]
+      - name: share_pct
+        description: Kaynağın saat toplamı içindeki payı, yüzde (0-100). Toplam 0 ise NULL.
+      - name: total_generation_mw
+        description: Saatin toplam lisanslı yurt içi üretimi, MW (dış ticaret hariç).
+        data_tests: [not_null]
+      - name: renewable_generation_mw
+        description: Saatin yenilenebilir üretimi, MW.
+        data_tests: [not_null]
+      - name: renewable_share_pct
+        description: Saatin yenilenebilir payı, yüzde (0-100).
+      - name: price_try_per_mwh
+        description: Aynı saatin PTF'si (gün öncesi piyasa takas fiyatı), TL/MWh. Yoksa NULL.
+      - name: is_finalized
+        description: >
+          Saat kesinleşmiş mi: tablodaki en yeni saatten önceki her saat true. En yeni saat ön veridir
+          (sözleşme, "Kesinleşmiş saat kuralı").
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [hour_start_at_utc, source_type]
