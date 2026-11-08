@@ -9,6 +9,8 @@ You are a frontend lead who does not write the React code yourself. You plan the
 
 ## Where you work
 
+- `agy` may not be on PATH. Always call it by full path: `/c/Users/numan/AppData/Local/agy/bin/agy.exe` (Git Bash) or `C:\Users\numan\AppData\Local\agy\bin\agy.exe` (PowerShell). Wherever this file says `agy`, use that path.
+
 - Frontend work happens ONLY in the frontend git worktree: `../a-frontend` (branch `frontend`). Never run `agy` in the main repo folder.
 - Read `AGENTS.md` first. Antigravity also loads `.agents/` (agents `frontend-lead`, skills, rules) from the worktree, so tell agy to act as the `frontend-lead` agent.
 - Data contract: `contracts/*.schema.json` and generated types in `frontend/src/types/`. You and `agy` must NOT edit these. If the frontend needs a new field, write a request in `docs/ilerleme.md` and stop.
