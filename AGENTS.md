@@ -16,8 +16,12 @@ Sürüm planı ve aşamalar: `prompt-surum1.md`. Güncel durum: `docs/ilerleme.m
 | React paneli, harita, tasarım | Antigravity (Gemini 4 Argon; küçük işlerde Gemini Flash) | `frontend/` |
 | Ortak | İki taraf da okur, ilgili bölümü günceller | `docs/ilerleme.md`, `AGENTS.md` |
 
-- Claude Code `frontend/` içinde kod yazmaz. Antigravity `pipeline/`, `dbt/`, `contracts/` içinde kod yazmaz.
-- Paralel çalışma git worktree ile yapılır: veri tarafı `a` klasöründe (`master`), frontend `a-frontend` klasöründe (`frontend` branch).
+- İki araç da aynı `a/` klasöründe ve `master` branch'inde çalışır. Worktree ya da ayrı branch kullanılmaz.
+- Antigravity yalnızca `a/frontend` klasörünü açar ve yalnızca `frontend/` içine yazar.
+- `frontend/src/types/` ve `frontend/public/data/` klasörlerini Claude Code'un scriptleri üretir. Antigravity bunlara dokunmaz.
+- `frontend/` içindeki diğer her şeyi Claude Code yalnızca okur. Build ve test çalıştırabilir, kod değiştirmez.
+- Antigravity `pipeline/`, `dbt/`, `contracts/`, `scripts/` içinde kod yazmaz.
+- Frontend görevleri, Claude Code'un yazdığı tek parça prompt'larla verilir. Kullanıcı bu prompt'u Antigravity'ye yapıştırır.
 
 ## Veri sözleşmesi (en önemli kural)
 
@@ -25,12 +29,13 @@ Sürüm planı ve aşamalar: `prompt-surum1.md`. Güncel durum: `docs/ilerleme.m
 - `frontend/src/types/` altındaki TypeScript tipleri şemalardan otomatik üretilir. Elle düzenlenmez.
 - Şemaları **sadece veri tarafı** değiştirir. Frontend yeni bir alana ihtiyaç duyarsa `docs/ilerleme.md` içindeki "Sözleşme istekleri" bölümüne not yazar ve bekler.
 - Frontend, `frontend/public/data/sample/` altındaki gerçek veriden üretilmiş örnek JSON'larla geliştirilir. Sahte veri uydurulmaz.
-- Her birleştirmeden (merge) sonra tek doğrulama komutu çalıştırılır: dışa aktar → şemayla doğrula → frontend tip kontrolü ve build.
+- Her frontend commit'inden önce tek doğrulama komutu çalıştırılır: `.venv/Scripts/python -X utf8 -m scripts.check`. Komut sırayla dışa aktarır, şemayla doğrular, tiplerin şemalarla uyumunu kontrol eder, frontend'de tip kontrolü ve build yapar.
 
 ## Alınmış ürün kararları
 
 - **Tahmin yok (Sürüm 1).** Panel sadece gerçekleşen veriyi gösterir.
 - **Lisanslı üretim.** Gerçek zamanlı veri lisanssız üretimi içermez. Sayaç etiketlerinde açıkça "lisanslı üretim" yazar. Lisanssız güneş için gecikme etiketli bir bilgi notu gösterilir.
+- **Tazelik eşikleri.** Ülke verisi için 4 saatte uyarı, 6 saatte hata. Santral verisi için 36 saatte uyarı, 48 saatte hata.
 - **Zaman ayrımı.** Kaynak bazlı ülke verisi yaklaşık 1 saat gecikmeli gelir. Santral bazlı veri en erken ertesi gün gelir.
 - **İki mod.** Canlı modda sayaçlar ve kaynak grafiği bugünü gösterir, harita en son tam günün son saatinde durur ve "Santral verisi: [tarih]" etiketi taşır. Oynatma modunda sayaçlar, grafik ve harita birlikte en son tam güne geçer.
 - **Akkuyu eşdeğeri** = kaynak üretimi (MW) / 1200. Veride nükleer kolonu yoksa panel hata vermez.
@@ -45,6 +50,12 @@ Sürüm planı ve aşamalar: `prompt-surum1.md`. Güncel durum: `docs/ilerleme.m
 
 ## Git
 
+- **Bütün commit'leri Claude Code atar. Antigravity git kullanmaz.**
+- Frontend değişiklikleri ayrı commit'lerle atılır. Kullanıcı "frontend bitti" dediğinde Claude Code şu sırayı izler:
+  1. Değişen dosyaların yalnızca `frontend/` içinde olduğunu kontrol eder.
+  2. `scripts.check` komutunu çalıştırır.
+  3. Commit atar.
+  4. `docs/ilerleme.md`'yi günceller.
 - Araç değiştirmeden önce commit atılır. Commit'ten önce `git status` gösterilir.
 - Kullanıcı istemedikçe merge ve push yapılmaz.
 - Sözleşme değişiklikleri kendi commit'inde, net bir mesajla gönderilir.

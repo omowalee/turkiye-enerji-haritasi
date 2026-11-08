@@ -44,3 +44,8 @@ BASLANGIC.md
 # Node
 contracts/node_modules/
 dbt/.user.yml
+
+# Frontend (Antigravity)
+frontend/node_modules/
+frontend/dist/
+.agy/

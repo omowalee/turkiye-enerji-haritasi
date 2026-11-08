@@ -6,7 +6,7 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 
 - Sürüm: 1
 - Tamamlanan: Aşama 0 (keşif), Aşama 1 (veri çekme, 90 gün geçmiş), sözleşme v0
-- Devam eden: Aşama 2 (dbt; staging bitti, sırada eşleştirme) — Claude Code · Frontend: agy kurulu, preflight geçti; tasarım önerisi izin kuralı onayını bekliyor
+- Devam eden: Aşama 2 (dbt; staging bitti, sırada eşleştirme) — Claude Code · Frontend: tasarım önerisi prompt'u kullanıcıda (Antigravity)
 - Alınmış kararlar: `AGENTS.md` → "Alınmış ürün kararları"
 
 ## Veri tarafı (Claude Code)
@@ -20,7 +20,7 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 - Kararlar (ayrıntı: AGENTS.md, docs/kararlar.md):
   - Santral verisi en erken ertesi gün geliyor (SEF1149). Saatlik iş santral verisini yalnızca dün için çekiyor.
   - İki mod: canlı modda sayaçlar ve grafik bugünü gösterir, harita en son tam günde durur. Oynatma modunda hepsi en son tam güne geçer.
-  - Tazelik eşikleri: santral verisi 36 saatte uyarı, 48 saatte hata. Kaynak bazlı veri 3 saatte uyarı, 6 saatte hata.
+  - Tazelik eşikleri: santral verisi 36 saatte uyarı, 48 saatte hata. Kaynak bazlı veri 4 saatte uyarı, 6 saatte hata (2026-11-08'de 3 saatten 4 saate çıkarıldı).
   - Lisanssız üretim: yalnızca lisanslı üretim gösterilir, "lisanslı üretim" etiketi ve gecikme etiketli lisanssız güneş notu eklenir. Tahmin Sürüm 2'de.
 - Sözleşme v0 (2026-11-08):
   - `contracts/`: 6 dosya şeması + `common.schema.json` (JSON Schema 2020-12, `schema_version` 0.1.0). Açıklama: `docs/data-contract.md`.
@@ -36,9 +36,8 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Doğrulama: tam `dbt build` PASS=64, WARN=0, ERROR=0; santral toplamı = ülke toplamı testi 5 tam günde geçti. `dbt source freshness` geçti.
   - Notlar: `eic` tekil değil (TUTES-A/B), eşleştirmede anahtar olamaz. OSM'de 513 satır adsız, 1.104 satırda kapasite yok. Plant view'ı tarih filtresiz ~0,7 GB tarar, mart'lar `date_tr` filtrelemeli.
 - Açık sorular:
-  - Tazelik eşiği: kaynak verisinin normal yaşı 1,7–2,7 sa; 3 sa uyarı eşiği ~20 dk pay bırakıyor, küçük gecikmede uyarı verir. Eşik değişmedi (karar kullanıcıda).
   - ~~Son saat eksik geliyor~~ → **karar verildi (2026-11-08):** `live.ts` = ülke verisindeki en son saatten bir önceki saat; en son saat `live.provisional` alanında. Aşama 2'de dbt kuralı + test.
-  - agy 1.5.3 kurulu (`/c/Users/numan/AppData/Local/agy/bin/agy.exe`), preflight geçti. Headless çalıştırmada `python .agents/skills/ui-ux-pro-max/scripts/search.py` komutu izin olmadığı için reddedildi; dar izin kuralı (`--settings .agy/settings.json`, oturuma özel) kullanıcı onayında. `--dangerously-skip-permissions` kullanılmayacak.
+  - **Çalışma şekli değişti (2026-11-08):** worktree ve agy otomasyonu iptal edildi. İki araç da `a/` içinde ve `master`'da çalışıyor. Antigravity yalnızca `frontend/` klasörüne yazıyor, git kullanmıyor. Commit'leri Claude Code atıyor. Kurallar `AGENTS.md`'de. `antigravity-frontend` ajanı `.claude-yedek/` klasörüne taşındı.
   - v0 eşleştirmesi geçici: %82,4 konumlu üretim, yanlış pozitif örneği "KARAKAYA HES TRABZON" → Diyarbakır.
   - Örnek export yerel `data/raw/` (git dışı) dosyalarına bağlı. dbt sonrası export mart'lardan okuyacak.
   - eptr2 hata türlerini ayırmıyor, tekrar deneme kararı mesaj metnine bakıyor (kırılgan).
