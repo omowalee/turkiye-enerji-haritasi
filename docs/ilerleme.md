@@ -73,7 +73,7 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - `scripts/publish.py`: gzip, Cache-Control, `snapshot_latest` en son. Bucket ya da anahtar yoksa yayın atlanır. GitHub Pages iş akışı: `.github/workflows/pages.yml`. README "Nasıl çalıştırılır" bölümü yazıldı.
   - Doğrulama: pytest 35/35. Container içinde `ingest_country`, `dbt_country` (PASS=57), `export`, `validate` geçti; `dbt_plant` (PASS=78) geçti. `publish` gerçek yüklemeyle denendi (2026-11-08): 7 dosya kovada, herkese açık 200, gzip, Cache-Control 300/3600 doğru; CORS henüz ayarlı değil. gitleaks: tüm geçmişte bulgu yok.
   - Durum: stack çalışıyor, DAG'lar duraklatılmış.
-  - Bekleyenler (kullanıcı): kovaya CORS uygulanması (`docker/cors.json` içinde GitHub kullanıcı adı); GitHub repo değişkeni `DATA_BASE_URL`; Antigravity için Vite `base` ve `VITE_DATA_BASE_URL`; DAG'ların açılması; `docker/airflow-entrypoint.sh` (kullanılmıyor) silinmesi.
+  - Bekleyenler (kullanıcı): kovaya CORS uygulanması (`docker/cors.json` içinde GitHub kullanıcı adı); GitHub repo değişkeni `DATA_BASE_URL`; Antigravity için Vite `base` ve `VITE_DATA_BASE_URL`; DAG'ların açılması.
 
 ## Frontend (Antigravity)
 
