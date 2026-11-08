@@ -32,6 +32,46 @@ export function formatMw(value: number): string {
 }
 
 /**
+ * İşaretli MW biçimi (denge = lisanslı üretim − tüketim için).
+ * Örnek: 429 -> "+429 MW", -9304 -> "-9.304 MW"
+ */
+export function formatSignedMw(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded > 0) {
+    return `+${intFormatter.format(rounded)} MW`;
+  }
+  if (rounded < 0) {
+    return `-${intFormatter.format(Math.abs(rounded))} MW`;
+  }
+  return "0 MW";
+}
+
+/**
+ * Net dış ticaret cümlesi (+ = net ithalat, - = net ihracat, ±10 MW arası dengede).
+ * Örnek: -990 -> "Türkiye şu an 990 MW net ihracat yapıyor"
+ */
+export function formatNetTrade(
+  netImportMw: number | null | undefined
+): string | null {
+  if (
+    netImportMw === null ||
+    netImportMw === undefined ||
+    Number.isNaN(netImportMw)
+  ) {
+    return null;
+  }
+  const rounded = Math.round(netImportMw);
+  if (Math.abs(rounded) <= 10) {
+    return "Dış ticaret dengede";
+  }
+  const absFormatted = intFormatter.format(Math.abs(rounded));
+  if (rounded < 0) {
+    return `Türkiye şu an ${absFormatted} MW net ihracat yapıyor`;
+  }
+  return `Türkiye şu an ${absFormatted} MW net ithalat yapıyor`;
+}
+
+/**
  * Örnek: 59.6 -> "%59,6"
  */
 export function formatPercent(value: number): string {

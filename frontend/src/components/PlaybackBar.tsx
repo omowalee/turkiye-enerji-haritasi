@@ -1,20 +1,36 @@
-import { memo } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { memo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Pause,
+  Play,
+  Repeat,
+  RotateCcw,
+} from "lucide-react";
+import { SourceStrip } from "@/components/SourceStrip";
 import type {
   DashboardMode,
   HourlyCounterSnapshot,
   PlaybackSpeed,
 } from "@/lib/data";
 import { formatLocalDate, formatMw, formatTimestampParts } from "@/lib/format";
+import type { MapFilter } from "@/lib/visual";
+import type { SourceLabels } from "@/types";
 
 interface PlaybackBarProps {
   mode: DashboardMode;
   plantsDayDate: string;
   playbackHours: HourlyCounterSnapshot[];
+  activeCounter: HourlyCounterSnapshot;
+  sourceLabels: SourceLabels;
+  activeFilter: MapFilter;
+  onSelectFilter: (filter: MapFilter) => void;
   selectedHourIndex: number;
   isPlaying: boolean;
+  isLooping: boolean;
   speed: PlaybackSpeed;
   onTogglePlay: () => void;
+  onToggleLoop: () => void;
   onSelectHour: (hourIndex: number) => void;
   onChangeSpeed: (speed: PlaybackSpeed) => void;
   onReturnToLive: () => void;
@@ -26,14 +42,22 @@ export const PlaybackBar = memo(function PlaybackBar({
   mode,
   plantsDayDate,
   playbackHours,
+  activeCounter,
+  sourceLabels,
+  activeFilter,
+  onSelectFilter,
   selectedHourIndex,
   isPlaying,
+  isLooping,
   speed,
   onTogglePlay,
+  onToggleLoop,
   onSelectHour,
   onChangeSpeed,
   onReturnToLive,
 }: PlaybackBarProps) {
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+
   if (playbackHours.length === 0) return null;
 
   const isPlayback = mode === "playback";
@@ -45,7 +69,6 @@ export const PlaybackBar = memo(function PlaybackBar({
     : null;
   const formattedDate = plantsDayDate ? formatLocalDate(plantsDayDate) : "";
 
-  // Zaman çubuğundaki mini sütunları ölçeklemek için günün tepe MW değeri
   let maxDailyMw = 1;
   for (let i = 0; i < playbackHours.length; i++) {
     if (playbackHours[i].totalMw > maxDailyMw) {
@@ -60,49 +83,91 @@ export const PlaybackBar = memo(function PlaybackBar({
 
   return (
     <section
-      aria-label="24 saatlik üretim oynatma çubuğu"
-      className={`z-20 border-t bg-[#0D1422]/95 px-3 py-2.5 backdrop-blur-md transition-colors sm:px-5 ${
-        isPlayback ? "border-[#38BDF8]/40" : "border-[#1E293B]"
+      aria-label="24 saatlik üretim oynatma çubuğu ve mobil kaynak sayfası"
+      className={`pointer-events-auto fixed right-2.5 bottom-2.5 left-2.5 z-20 rounded-2xl border bg-[#060B14]/82 px-3 py-2 shadow-[0_18px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-all md:right-20 md:bottom-4 md:left-4 md:px-4 md:py-2.5 ${
+        isPlayback ? "border-[#38BDF8]/35" : "border-white/12"
       }`}
     >
-      <div className="mx-auto flex max-w-[1920px] flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
-        {/* Sol Kontroller: Oynat/Duraklat + Hız Seçimi (1x, 2x, 4x) + Seçili Saat Özeti */}
-        <div className="flex flex-wrap items-center justify-between gap-2 lg: shrink-0">
-          <div className="flex items-center gap-2">
-            {/* Oynat / Duraklat Düğmesi */}
+      {/* MOBİL (< 768px): Alttan Açılan Sayfa Tutamacı (Kaynak Şeridini Açar/Kapatır) */}
+      <div className="mb-1.5 flex items-center justify-between border-b border-white/8 pb-1.5 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileSheetOpen((v) => !v)}
+          aria-expanded={mobileSheetOpen}
+          className="flex w-full items-center justify-between text-[11px] font-medium text-[#94A3B8] hover:text-[#F8FAFC]"
+        >
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-1.5 w-6 rounded-full bg-white/25" />
+            <span>Kaynak Dağılımı Şeridi (11 kaynak)</span>
+          </span>
+          {mobileSheetOpen ? (
+            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+
+      {/* MOBİL (< 768px): Alttan Açılan Kaynak Şeridi İçeriği */}
+      {mobileSheetOpen && (
+        <div className="mb-2.5 border-b border-white/10 pb-2.5 md:hidden">
+          <SourceStrip
+            counter={activeCounter}
+            sourceLabels={sourceLabels}
+            activeFilter={activeFilter}
+            onSelectFilter={onSelectFilter}
+            compact
+          />
+        </div>
+      )}
+
+      {/* Ana İnce Oynatma Çubuğu */}
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3.5">
+        {/* Sol: Oynat/Duraklat + Hız (1×, 2×, 4×) + Döngü + Saat Göstergesi */}
+        <div className="flex flex-wrap items-center justify-between gap-2 lg:shrink-0">
+          <div className="flex items-center gap-1.5">
+            {/* Oynat / Duraklat */}
             <button
               type="button"
               onClick={onTogglePlay}
               aria-label={
-                isPlaying ? "Oynatmayı duraklat (Boşluk)" : "24 saati oynat (Boşluk)"
+                isPlaying
+                  ? "Oynatmayı duraklat (Boşluk)"
+                  : "24 saati oynat (Boşluk)"
               }
               title="Boşluk tuşu ile oynat / duraklat"
-              className={`inline-flex min-h-[38px] items-center gap-2 rounded-lg border px-3.5 py-1.5 text-xs font-semibold shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-[#38BDF8] ${
+              className={`inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-semibold transition-all focus-visible:outline-2 focus-visible:outline-[#38BDF8] ${
                 isPlaying
-                  ? "border-[#38BDF8] bg-[#38BDF8] text-[#060A12] shadow-[0_0_16px_rgba(56,189,248,0.45)]"
+                  ? "border-[#38BDF8] bg-[#38BDF8] text-[#03060C] shadow-[0_0_18px_rgba(56,189,248,0.5)]"
                   : isPlayback
-                    ? "border-[#38BDF8]/60 bg-[#38BDF8]/15 text-[#38BDF8] hover:bg-[#38BDF8]/25"
-                    : "border-[#334155] bg-[#151F32] text-[#F8FAFC] hover:border-[#38BDF8]/50 hover:text-[#38BDF8]"
+                    ? "border-[#38BDF8]/50 bg-[#38BDF8]/15 text-[#38BDF8] hover:bg-[#38BDF8]/25"
+                    : "border-white/15 bg-white/[0.06] text-[#F8FAFC] hover:border-[#38BDF8]/50 hover:text-[#38BDF8]"
               }`}
             >
               {isPlaying ? (
                 <>
-                  <Pause className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                  <Pause
+                    className="h-3.5 w-3.5 fill-current"
+                    aria-hidden="true"
+                  />
                   <span>Duraklat</span>
                 </>
               ) : (
                 <>
-                  <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                  <Play
+                    className="h-3.5 w-3.5 fill-current"
+                    aria-hidden="true"
+                  />
                   <span>Oynat</span>
                 </>
               )}
             </button>
 
-            {/* Hız Seçici: 1×, 2×, 4× */}
+            {/* Hız Seçimi: 1×, 2×, 4× */}
             <div
               role="group"
               aria-label="Oynatma hızı"
-              className="inline-flex items-center rounded-lg border border-[#1E293B] bg-[#060A12] p-0.5"
+              className="inline-flex items-center rounded-xl border border-white/10 bg-[#03060C]/90 p-0.5"
             >
               {SPEEDS.map((s) => {
                 const active = speed === s;
@@ -112,8 +177,8 @@ export const PlaybackBar = memo(function PlaybackBar({
                     type="button"
                     onClick={() => onChangeSpeed(s)}
                     aria-pressed={active}
-                    title={`Oynatma hızı: ${s}× (saat başına ${1000 / s} ms)`}
-                    className={`min-h-[30px] min-w-[34px] rounded-md px-2 font-mono-data text-xs font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-[#38BDF8] ${
+                    title={`Oynatma hızı: ${s}×`}
+                    className={`min-h-[26px] min-w-[30px] rounded-lg px-1.5 font-mono-data text-[11px] font-semibold tabular-nums transition-colors ${
                       active
                         ? "bg-[#38BDF8]/20 text-[#38BDF8] shadow-[inset_0_0_0_1px_rgba(56,189,248,0.4)]"
                         : "text-[#94A3B8] hover:text-[#F8FAFC]"
@@ -124,18 +189,39 @@ export const PlaybackBar = memo(function PlaybackBar({
                 );
               })}
             </div>
-          </div>
 
-          {/* Seçili Gün ve Saat Göstergesi */}
-          <div className="flex items-center gap-2 font-mono-data text-xs tabular-nums">
-            <div
-              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 ${
-                isPlayback
-                  ? "border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#F8FAFC]"
-                  : "border-[#1E293B] bg-[#060A12]/80 text-[#94A3B8]"
+            {/* Yeni: "Döngü" Düğmesi (Açıkken 23:00'dan sonra 00:00'a dönüp oynamaya devam eder) */}
+            <button
+              type="button"
+              onClick={onToggleLoop}
+              aria-pressed={isLooping}
+              aria-label="24 saatlik oynatma döngüsü"
+              title={
+                isLooping
+                  ? "Döngü açık: 23:00'dan sonra 00:00'a dönüp devam eder"
+                  : "Döngü kapalı: 23:00'dan sonra başa sarıp durur"
+              }
+              className={`inline-flex min-h-[34px] items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition-all focus-visible:outline-2 focus-visible:outline-[#38BDF8] ${
+                isLooping
+                  ? "border-[#38BDF8]/55 bg-[#38BDF8]/18 text-[#38BDF8]"
+                  : "border-white/10 bg-[#03060C]/80 text-[#94A3B8] hover:border-white/20 hover:text-[#F8FAFC]"
               }`}
             >
-              <span className="text-[#94A3B8]">{formattedDate}</span>
+              <Repeat className="h-3 w-3" aria-hidden="true" />
+              <span className="hidden sm:inline">Döngü</span>
+            </button>
+          </div>
+
+          {/* Seçili Gün, Saat ve Toplam MW */}
+          <div className="flex items-center gap-1.5 font-mono-data text-xs tabular-nums">
+            <div
+              className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 ${
+                isPlayback
+                  ? "border-[#38BDF8]/40 bg-[#38BDF8]/12 text-[#F8FAFC]"
+                  : "border-white/10 bg-[#03060C]/80 text-[#94A3B8]"
+              }`}
+            >
+              <span className="text-[11px] text-[#94A3B8]">{formattedDate}</span>
               <span
                 className={`font-bold ${
                   isPlayback ? "text-[#38BDF8]" : "text-[#F8FAFC]"
@@ -143,8 +229,8 @@ export const PlaybackBar = memo(function PlaybackBar({
               >
                 {currentParts?.hour ?? "23:00"}
               </span>
-              <span className="hidden text-[#64748B] sm:inline">·</span>
-              <span className="hidden font-semibold text-[#F8FAFC] sm:inline">
+              <span className="hidden text-white/20 sm:inline">·</span>
+              <span className="hidden text-[11px] font-semibold text-[#F8FAFC] sm:inline">
                 {currentSnapshot ? formatMw(currentSnapshot.totalMw) : ""}
               </span>
             </div>
@@ -153,28 +239,27 @@ export const PlaybackBar = memo(function PlaybackBar({
               <button
                 type="button"
                 onClick={onReturnToLive}
-                title="Canlı moda geri dön"
-                className="inline-flex min-h-[30px] items-center gap-1 rounded-md border border-[#10B981]/40 bg-[#10B981]/10 px-2.5 py-1 font-sans-ui text-[11px] font-semibold text-[#10B981] transition-colors hover:bg-[#10B981]/20"
+                title="Canlı moda dön"
+                className="inline-flex min-h-[30px] items-center gap-1 rounded-xl border border-[#10B981]/40 bg-[#10B981]/12 px-2 py-1 font-sans-ui text-[11px] font-semibold text-[#10B981] transition-colors hover:bg-[#10B981]/20"
               >
                 <RotateCcw className="h-3 w-3" aria-hidden="true" />
-                <span>Canlıya Dön</span>
+                <span className="hidden sm:inline">Canlı</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Orta / Sağ: 24 Saat İşaretli Sürüklenebilir Zaman Çubuğu */}
-        <div className="relative flex flex-1 flex-col justify-center pt-1 pb-0.5">
-          {/* 24 Saatlik Mini Üretim Profili ve Sürüklenebilir İmleç */}
-          <div className="relative h-9 w-full select-none">
-            {/* Arka Plan Saatlik Mini Çubuklar */}
+        {/* Orta / Sağ: 24 Saatlik Mini Üretim Profili ve Sürüklenebilir İmleç */}
+        <div className="relative flex flex-1 flex-col justify-center">
+          <div className="relative h-8 w-full select-none">
+            {/* Saatlik Mini Üretim Profili Çubukları */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-0 bottom-4 grid grid-cols-24 items-end gap-0.5 px-1"
+              className="pointer-events-none absolute inset-x-0 top-0 bottom-3.5 grid grid-cols-24 items-end gap-0.5 px-1"
             >
               {playbackHours.map((item, idx) => {
                 const heightPct = Math.max(
-                  15,
+                  16,
                   Math.round((item.totalMw / maxDailyMw) * 100)
                 );
                 const isSelected = idx === selectedHourIndex;
@@ -188,12 +273,12 @@ export const PlaybackBar = memo(function PlaybackBar({
                       style={{ height: `${heightPct}%` }}
                       className={`w-full rounded-t-[2px] transition-colors duration-150 ${
                         isSelected
-                          ? "bg-[#38BDF8] shadow-[0_0_8px_rgba(56,189,248,0.8)]"
+                          ? "bg-[#38BDF8] shadow-[0_0_10px_rgba(56,189,248,0.9)]"
                           : isPast
                             ? isPlayback
                               ? "bg-[#38BDF8]/45"
-                              : "bg-[#334155]"
-                            : "bg-[#1E293B]"
+                              : "bg-white/25"
+                            : "bg-white/10"
                       }`}
                     />
                   </div>
@@ -201,20 +286,20 @@ export const PlaybackBar = memo(function PlaybackBar({
               })}
             </div>
 
-            {/* İlerleme Çizgisi (Track) */}
+            {/* İnce İlerleme Çizgisi */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-1 bottom-3.5 h-1.5 overflow-hidden rounded-full bg-[#1E293B]"
+              className="pointer-events-none absolute inset-x-1 bottom-3 h-1 overflow-hidden rounded-full bg-white/10"
             >
               <div
                 style={{ width: `${progressPct}%` }}
                 className={`h-full transition-all duration-150 ${
-                  isPlayback ? "bg-[#38BDF8]" : "bg-[#10B981]/70"
+                  isPlayback ? "bg-[#38BDF8]" : "bg-[#10B981]/75"
                 }`}
               />
             </div>
 
-            {/* Sürüklenebilir Range Input (Tam 24 saat üzerinde erişilebilir kontrol) */}
+            {/* Sürüklenebilir Range Input */}
             <input
               type="range"
               min={0}
@@ -227,13 +312,13 @@ export const PlaybackBar = memo(function PlaybackBar({
               aria-valuemax={playbackHours.length - 1}
               aria-valuenow={selectedHourIndex}
               aria-valuetext={`${formattedDate} ${currentParts?.hour ?? ""}`}
-              className="absolute inset-x-0 top-0 bottom-2 z-10 h-7 w-full cursor-pointer appearance-none bg-transparent accent-[#38BDF8] focus-visible:outline-none"
+              className="absolute inset-x-0 top-0 bottom-2 z-10 h-6 w-full cursor-pointer appearance-none bg-transparent accent-[#38BDF8] focus-visible:outline-none"
             />
 
             {/* 24 Saat İşaretleri (00 .. 23) */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 bottom-0 grid grid-cols-24 px-0.5 text-center font-mono-data text-[9px] leading-none tabular-nums sm:text-[10px]"
+              className="pointer-events-none absolute inset-x-0 bottom-0 grid grid-cols-24 px-0.5 text-center font-mono-data text-[9px] leading-none tabular-nums"
             >
               {playbackHours.map((item, idx) => {
                 const hourStr = String(idx).padStart(2, "0");
@@ -243,7 +328,7 @@ export const PlaybackBar = memo(function PlaybackBar({
                   <span
                     key={item.ts}
                     className={`${
-                      showOnMobile ? " opacity-100" : "opacity-0 sm:opacity-100"
+                      showOnMobile ? "opacity-100" : "opacity-0 sm:opacity-100"
                     } ${
                       isSelected
                         ? "font-bold text-[#38BDF8]"

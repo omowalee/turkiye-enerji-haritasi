@@ -1,129 +1,506 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DeckGL from "@deck.gl/react";
-import { MapView, type MapViewState, type PickingInfo } from "@deck.gl/core";
-import { ColumnLayer, GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import {
-  AlertTriangle,
-  Box,
-  Calendar,
-  Info,
-  Layers,
-  Minus,
-  Plus,
-  RotateCcw,
-  Sun,
-  X,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { SOURCE_PALETTE } from "@/lib/constants";
-import type { DashboardMode, LocatedPlantPoint } from "@/lib/data";
+  MapView,
+  WebMercatorViewport,
+  type MapViewState,
+  type PickingInfo,
+} from "@deck.gl/core";
+import { GeoJsonLayer, PathLayer, TextLayer } from "@deck.gl/layers";
+import { AlertTriangle, Box, Layers, Minus, Plus, RotateCcw } from "lucide-react";
 import {
-  evaluateFreshness,
-  formatLocalDate,
-  formatMonthLabel,
-  formatMw,
-  formatNumber,
-  formatTimestampParts,
-} from "@/lib/format";
+  ProvinceFloatingPanel,
+  type FilterProvinceRankInfo,
+} from "@/components/ProvinceFloatingPanel";
+import { StackedSolidPolygonLayer } from "@/components/StackedSolidPolygonLayer";
+import { DEFAULT_SOURCE_ORDER, SOURCE_PALETTE } from "@/lib/constants";
+import type { Province24hSeries, ProvinceHourlySlice } from "@/lib/data";
+import { formatTimestampParts } from "@/lib/format";
+import {
+  ACTIVE_PROVINCE_OPACITY,
+  COAST_COUNTRY_BORDER_RGBA,
+  COAST_COUNTRY_BORDER_WIDTH_PX,
+  computeSingleSourceShadeRgb,
+  computeSliceSourceRgb,
+  DEFAULT_3D_BEARING_DEG,
+  DEFAULT_3D_PITCH_DEG,
+  FILTER_TRANSITION_MS,
+  HOVER_HEIGHT_MULTIPLIER,
+  HOVER_LIFT_RATIO,
+  HOVER_MIN_LIFT_M,
+  HOVER_TRANSITION_MS,
+  LOW_PROVINCE_BASE_ELEVATION_M,
+  LOW_PROVINCE_FILL_RGBA,
+  LOW_PROVINCE_THRESHOLD_MW,
+  type MapFilter,
+  MAX_PROVINCE_BLOCK_ELEVATION_M,
+  MOBILE_BREAKPOINT_PX,
+  NEIGHBOR_BORDER_RGBA,
+  NEIGHBOR_LAND_FILL_RGBA,
+  OTHER_PROVINCES_DIM_OPACITY,
+  PLAYBACK_TRANSITION_MS,
+  PROVINCE_BORDER_RGBA,
+  PROVINCE_BORDER_WIDTH_PX,
+  PROVINCE_FILL_RGBA,
+  PROVINCE_HOVER_BORDER_RGBA,
+  PROVINCE_HOVER_BORDER_WIDTH_PX,
+  PROVINCE_LABEL_ALL_MIN_ZOOM,
+  PROVINCE_LABEL_COLOR_RGBA,
+  PROVINCE_LABEL_DIM_COLOR_RGBA,
+  PROVINCE_LABEL_ELEVATION_PADDING_M,
+  PROVINCE_LABEL_FONT_SIZE_PX,
+  PROVINCE_LABEL_HOVER_FONT_SIZE_PX,
+  PROVINCE_LABEL_OUTLINE_RGBA,
+  PROVINCE_LABEL_TOP_COUNT,
+  SEA_BACKGROUND_HEX,
+  TURKEY_BOUNDS,
+  ZERO_SOURCE_PROVINCE_FILL_RGBA,
+} from "@/lib/visual";
 import type {
   ProvinceFeature,
   Provinces,
-  SnapshotLatest,
   SourceLabels,
+  SourceType,
 } from "@/types";
 
-interface TurkeyMapProps {
+export interface TurkeyMapProps {
   provincesGeoJson: Provinces | null;
-  plants: LocatedPlantPoint[];
-  totalPlantsInCatalog: number;
-  snapshot: SnapshotLatest | null;
+  provinceSeriesByPlate: ReadonlyMap<number, Province24hSeries> | null;
+  neighborsGeoJson: GeoJSON.FeatureCollection | null;
   sourceLabels: SourceLabels | null;
-  mode: DashboardMode;
+  activeFilter: MapFilter;
   selectedHourIndex: number;
   selectedHourTimestamp: string | null;
-  selectedHourTotalMw: number | null;
-  transitionDurationMs: number;
+  isPlaying?: boolean;
   loading: boolean;
 }
 
-interface SelectedPlantCardState {
-  plantId: number;
+export interface ProvinceLabelItem {
+  plate: number;
+  name: string;
+  position: [number, number];
+}
+
+interface ProvincePolygonPart {
+  plate: number;
+  name: string;
+  rings: [number, number][][];
+  centroid: [number, number];
+}
+
+export interface ProvinceGeometryMeta {
+  labels: ProvinceLabelItem[];
+  centroidByPlate: Map<number, [number, number]>;
+  polygonParts: ProvincePolygonPart[];
+  outerBorderPaths: [number, number][][];
+  featureByPlate: Map<number, ProvinceFeature>;
+}
+
+interface ProvinceSliceInstance {
+  id: string;
+  plate: number;
+  name: string;
+  source: SourceType;
+  polygon: [number, number][][];
+  centroid: [number, number];
+}
+
+interface SliceVisualMetrics {
+  baseElevationM: number;
+  sliceElevationM: number;
+  scaleRatio: number;
+  fillColor: [number, number, number, number];
+}
+
+interface ProvinceInteractionTarget {
+  plate: number;
   x: number;
   y: number;
 }
-
-const TURKEY_CENTER = {
-  longitude: 35.25,
-  latitude: 39.05,
-};
-
-const DESKTOP_DEFAULT_PITCH = 45;
-const MOBILE_BREAKPOINT_PX = 768;
 
 function easeCubicOut(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
-function getInitialViewState(width: number, is3DMode: boolean): MapViewState {
-  const isSmallMobile = width < 640;
-  const isTablet = width >= 640 && width < 1024;
+/**
+ * Bir poligon halkasının (ring) işaretli alanını ve alan-ağırlıklı merkezini (centroid) hesaplar.
+ */
+function computeRingAreaAndCentroid(ring: [number, number][]): {
+  absArea: number;
+  centroid: [number, number];
+} {
+  const n = ring.length;
+  if (n === 0) return { absArea: 0, centroid: [35.25, 39.0] };
+
+  let twiceArea = 0;
+  let cx = 0;
+  let cy = 0;
+  let sumX = 0;
+  let sumY = 0;
+
+  for (let i = 0; i < n; i++) {
+    const [x0, y0] = ring[i];
+    const [x1, y1] = ring[(i + 1) % n];
+    const cross = x0 * y1 - x1 * y0;
+    twiceArea += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
+    sumX += x0;
+    sumY += y0;
+  }
+
+  const absArea = Math.abs(twiceArea) * 0.5;
+  if (absArea < 1e-7) {
+    return { absArea: 0, centroid: [sumX / n, sumY / n] };
+  }
+  const factor = 1 / (3 * twiceArea);
+  return { absArea, centroid: [cx * factor, cy * factor] };
+}
+
+function pointToSegmentDistSq(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 1e-12) {
+    const ex = px - x1;
+    const ey = py - y1;
+    return ex * ex + ey * ey;
+  }
+  const t = Math.max(
+    0,
+    Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq)
+  );
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+  const ex = px - projX;
+  const ey = py - projY;
+  return ex * ex + ey * ey;
+}
+
+function makeUndirectedEdgeKey(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): string {
+  const k1 = `${Math.round(x1 * 1000)},${Math.round(y1 * 1000)}`;
+  const k2 = `${Math.round(x2 * 1000)},${Math.round(y2 * 1000)}`;
+  return k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`;
+}
+
+/**
+ * 81 il GeoJSON verisinden:
+ * 1) Her ilin ana kara parçasının merkezini,
+ * 2) 3B blok ekstrüzyonu için anlamlı büyüklükteki il poligon parçalarını,
+ * 3) Türkiye'nin dış sınırını / kıyı ve ülke sınır çizgilerini (#4A6A90, 1,5 px için)
+ * bir kez hesaplar.
+ */
+export function buildProvinceGeometryMeta(
+  provincesGeoJson: Provinces | null
+): ProvinceGeometryMeta {
+  const labels: ProvinceLabelItem[] = [];
+  const centroidByPlate = new Map<number, [number, number]>();
+  const polygonParts: ProvincePolygonPart[] = [];
+  const outerBorderPaths: [number, number][][] = [];
+  const featureByPlate = new Map<number, ProvinceFeature>();
+
+  if (!provincesGeoJson) {
+    return {
+      labels,
+      centroidByPlate,
+      polygonParts,
+      outerBorderPaths,
+      featureByPlate,
+    };
+  }
+
+  interface ProvinceRingsRecord {
+    plate: number;
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    rings: [number, number][][];
+    segments: [number, number, number, number][];
+  }
+
+  const provinceRecords: ProvinceRingsRecord[] = [];
+  const edgeFrequency = new Map<string, number>();
+
+  for (const feature of provincesGeoJson.features) {
+    const plate = feature.properties.plate;
+    const name = feature.properties.name;
+    featureByPlate.set(plate, feature);
+
+    const rawRings: [number, number][][] = [];
+    const candidatePolys: {
+      rings: [number, number][][];
+      area: number;
+      centroid: [number, number];
+    }[] = [];
+
+    if (feature.geometry.type === "Polygon") {
+      const coords = feature.geometry.coordinates as [number, number][][];
+      if (coords.length > 0 && coords[0].length >= 3) {
+        const { absArea, centroid } = computeRingAreaAndCentroid(coords[0]);
+        candidatePolys.push({ rings: coords, area: absArea, centroid });
+      }
+      for (const ring of coords) {
+        if (ring && ring.length >= 3) rawRings.push(ring);
+      }
+    } else if (feature.geometry.type === "MultiPolygon") {
+      const multiCoords = feature.geometry
+        .coordinates as [number, number][][][];
+      for (const poly of multiCoords) {
+        if (poly.length > 0 && poly[0].length >= 3) {
+          const { absArea, centroid } = computeRingAreaAndCentroid(poly[0]);
+          candidatePolys.push({ rings: poly, area: absArea, centroid });
+        }
+        for (const ring of poly) {
+          if (ring && ring.length >= 3) rawRings.push(ring);
+        }
+      }
+    }
+
+    candidatePolys.sort((a, b) => b.area - a.area);
+    for (let idx = 0; idx < candidatePolys.length; idx++) {
+      // En büyük ana kara parçasını ve anlamlı büyüklükteki yarımada/adaları (İstanbul iki yakası, Çanakkale vb.) tut;
+      // mikroskobik kıyı kayalıklarını (> 0.0025 derece²) eler.
+      if (idx === 0 || candidatePolys[idx].area >= 0.0025) {
+        polygonParts.push({
+          plate,
+          name,
+          rings: candidatePolys[idx].rings,
+          centroid: candidatePolys[idx].centroid,
+        });
+      }
+    }
+
+    let bestArea = -1;
+    let bestCentroid: [number, number] = [35.25, 39.0];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const segments: [number, number, number, number][] = [];
+
+    for (const ring of rawRings) {
+      const { absArea, centroid } = computeRingAreaAndCentroid(ring);
+      if (absArea > bestArea) {
+        bestArea = absArea;
+        bestCentroid = centroid;
+      }
+
+      for (let i = 0; i < ring.length - 1; i++) {
+        const [x1, y1] = ring[i];
+        const [x2, y2] = ring[i + 1];
+        if (x1 < minX) minX = x1;
+        if (x2 < minX) minX = x2;
+        if (y1 < minY) minY = y1;
+        if (y2 < minY) minY = y2;
+        if (x1 > maxX) maxX = x1;
+        if (x2 > maxX) maxX = x2;
+        if (y1 > maxY) maxY = y1;
+        if (y2 > maxY) maxY = y2;
+
+        if (x1 === x2 && y1 === y2) continue;
+        segments.push([x1, y1, x2, y2]);
+        const key = makeUndirectedEdgeKey(x1, y1, x2, y2);
+        edgeFrequency.set(key, (edgeFrequency.get(key) ?? 0) + 1);
+      }
+    }
+
+    centroidByPlate.set(plate, bestCentroid);
+    labels.push({
+      plate,
+      name,
+      position: bestCentroid,
+    });
+
+    provinceRecords.push({
+      plate,
+      minX,
+      minY,
+      maxX,
+      maxY,
+      rings: rawRings,
+      segments,
+    });
+  }
+
+  const proximityMargin = 0.025;
+  const maxInternalDistSq = 0.011 * 0.011;
+
+  const isInternalSegment = (
+    plate: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number
+  ): boolean => {
+    const key = makeUndirectedEdgeKey(x1, y1, x2, y2);
+    if ((edgeFrequency.get(key) ?? 0) > 1) return true;
+
+    const q1x = x1 * 0.75 + x2 * 0.25;
+    const q1y = y1 * 0.75 + y2 * 0.25;
+    const q2x = x1 * 0.25 + x2 * 0.75;
+    const q2y = y1 * 0.25 + y2 * 0.75;
+
+    for (let j = 0; j < provinceRecords.length; j++) {
+      const other = provinceRecords[j];
+      if (other.plate === plate) continue;
+      if (
+        q1x < other.minX - proximityMargin ||
+        q1x > other.maxX + proximityMargin ||
+        q1y < other.minY - proximityMargin ||
+        q1y > other.maxY + proximityMargin
+      ) {
+        continue;
+      }
+
+      let q1Close = false;
+      let q2Close = false;
+      const segs = other.segments;
+      for (let s = 0; s < segs.length; s++) {
+        const [sx1, sy1, sx2, sy2] = segs[s];
+        if (
+          !q1Close &&
+          pointToSegmentDistSq(q1x, q1y, sx1, sy1, sx2, sy2) <=
+            maxInternalDistSq
+        ) {
+          q1Close = true;
+        }
+        if (
+          !q2Close &&
+          pointToSegmentDistSq(q2x, q2y, sx1, sy1, sx2, sy2) <=
+            maxInternalDistSq
+        ) {
+          q2Close = true;
+        }
+        if (q1Close && q2Close) return true;
+      }
+    }
+    return false;
+  };
+
+  for (const rec of provinceRecords) {
+    for (const ring of rec.rings) {
+      let currentPath: [number, number][] = [];
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p1 = ring[i];
+        const p2 = ring[i + 1];
+        if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
+
+        if (!isInternalSegment(rec.plate, p1[0], p1[1], p2[0], p2[1])) {
+          if (currentPath.length === 0) {
+            currentPath.push(p1, p2);
+          } else {
+            currentPath.push(p2);
+          }
+        } else if (currentPath.length >= 2) {
+          outerBorderPaths.push(currentPath);
+          currentPath = [];
+        } else {
+          currentPath = [];
+        }
+      }
+      if (currentPath.length >= 2) {
+        outerBorderPaths.push(currentPath);
+      }
+    }
+  }
+
   return {
-    longitude: TURKEY_CENTER.longitude,
-    latitude: TURKEY_CENTER.latitude,
-    zoom: isSmallMobile ? 4.05 : isTablet ? 4.85 : 5.45,
-    minZoom: 3.5,
-    maxZoom: 11,
-    pitch: is3DMode ? DESKTOP_DEFAULT_PITCH : 0,
-    bearing: 0,
-    maxPitch: 65,
-    minPitch: 0,
+    labels,
+    centroidByPlate,
+    polygonParts,
+    outerBorderPaths,
+    featureByPlate,
   };
 }
 
 /**
- * Seçili saatteki üretime (MW) göre taban nokta yarıçapı (piksel).
- * Karekök ölçekleme sayesinde hem 5 MW hem 1.912 MW santraller okunaklı kalır.
+ * WebMercatorViewport.fitBounds kullanarak Türkiye sınırlarını
+ * sol üst panel, üstteki filtre düğme grubu ve alt oynatma çubuğu boşluklarıyla (padding) ekrana tam sığdırır.
  */
-function computePlantRadiusPx(mw: number): number {
-  if (mw <= 0) return 3.2;
-  return Math.min(24, 4.0 + Math.sqrt(mw) * 0.42);
+function computeFittedViewState(
+  width: number,
+  height: number,
+  is3DMode: boolean
+): MapViewState {
+  const safeWidth = Math.max(320, width);
+  const safeHeight = Math.max(360, height);
+  const isMobile = safeWidth < MOBILE_BREAKPOINT_PX;
+
+  const padding = isMobile
+    ? { top: 72, bottom: 136, left: 16, right: 16 }
+    : { top: 92, bottom: 96, left: 444, right: 76 };
+
+  try {
+    const viewport = new WebMercatorViewport({
+      width: safeWidth,
+      height: safeHeight,
+    }).fitBounds(TURKEY_BOUNDS, { padding });
+
+    return {
+      longitude: viewport.longitude,
+      latitude: viewport.latitude,
+      zoom: Math.max(3.8, Math.min(8.5, viewport.zoom)),
+      minZoom: 3.5,
+      maxZoom: 11.5,
+      pitch: is3DMode ? DEFAULT_3D_PITCH_DEG : 0,
+      bearing: is3DMode ? DEFAULT_3D_BEARING_DEG : 0,
+      maxPitch: 65,
+      minPitch: 0,
+    };
+  } catch {
+    return {
+      longitude: 35.25,
+      latitude: 39.0,
+      zoom: isMobile ? 4.1 : 5.4,
+      minZoom: 3.5,
+      maxZoom: 11.5,
+      pitch: is3DMode ? DEFAULT_3D_PITCH_DEG : 0,
+      bearing: is3DMode ? DEFAULT_3D_BEARING_DEG : 0,
+      maxPitch: 65,
+      minPitch: 0,
+    };
+  }
 }
 
-/**
- * 3D sütun yüksekliği (metre) hesaplaması — KAREKÖK ÖLÇEK GEREKÇESİ:
- * Türkiye'deki santrallerin saatlik üretimi 1 MW ile ~1.912 MW (Atatürk HES / Zetes / Soma)
- * arasında yaklaşık 1:1900 oranında değişir. Doğrusal (lineer) ölçek kullanıldığında:
- * - Ya ~1.500+ MW santraller ekranın üstünden taşar,
- * - Ya da 5–50 MW aralığındaki yüzlerce güneş, rüzgâr ve akarsu santrali < 1 piksel kalıp kaybolur.
- *
- * Karekök ölçek (`4500 + sqrt(MW) * 3200` metre) dinamik aralığı ~1:19'a sıkıştırır:
- * - 0 MW üretim      → 0 m (yalnızca taban noktası görünür, sütun yükselmez)
- * - 5 MW santral     → ~11.655 m (Türkiye ölçeğinde ~6px, taban noktasının üzerinde net seçilir)
- * - 100 MW santral   → ~36.500 m (~20px)
- * - 500 MW santral   → ~76.050 m (~42px)
- * - 1.500 MW santral → ~128.435 m (~72px, Türkiye haritasında baskın ama taşmayan yükseklik)
- */
-function computeColumnElevationMeters(mw: number): number {
-  if (mw <= 0) return 0;
-  return 4500 + Math.sqrt(mw) * 3200;
+function isSourceInFilter(
+  source: SourceType,
+  filter: MapFilter,
+  sourceLabels: SourceLabels | null
+): boolean {
+  if (filter === "all") return true;
+  const isRen =
+    sourceLabels?.sources[source]?.renewable ?? SOURCE_PALETTE[source].renewable;
+  if (filter === "renewable") return isRen;
+  if (filter === "fossil") return !isRen;
+  return source === filter;
 }
 
 export const TurkeyMap = memo(function TurkeyMap({
   provincesGeoJson,
-  plants,
-  totalPlantsInCatalog,
-  snapshot,
+  provinceSeriesByPlate,
+  neighborsGeoJson,
   sourceLabels,
-  mode,
+  activeFilter,
   selectedHourIndex,
   selectedHourTimestamp,
-  selectedHourTotalMw,
-  transitionDurationMs,
+  isPlaying = false,
   loading,
 }: TurkeyMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Mobilde (< 768px) varsayılan 2D, masaüstünde (>= 768px) varsayılan 3D (~45° eğim)
   const [is3D, setIs3D] = useState<boolean>(() =>
     typeof window !== "undefined"
       ? window.innerWidth >= MOBILE_BREAKPOINT_PX
@@ -131,59 +508,350 @@ export const TurkeyMap = memo(function TurkeyMap({
   );
 
   const [viewState, setViewState] = useState<MapViewState>(() => {
-    const initialWidth =
-      typeof window !== "undefined" ? window.innerWidth : 1280;
-    const initial3D = initialWidth >= MOBILE_BREAKPOINT_PX;
-    return getInitialViewState(initialWidth, initial3D);
+    const w = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const h = typeof window !== "undefined" ? window.innerHeight : 800;
+    const initial3D = w >= MOBILE_BREAKPOINT_PX;
+    return computeFittedViewState(w, h, initial3D);
   });
 
-  // Hover yalnızca görsel vurgu ve imleç içindir; bilgi kartı tıklamayla (selectedPlantCard) açılır
-  const [hoveredPlantId, setHoveredPlantId] = useState<number | null>(null);
-  const [selectedPlantCard, setSelectedPlantCard] =
-    useState<SelectedPlantCardState | null>(null);
-  const [hoveredProvincePlate, setHoveredProvincePlate] = useState<
-    number | null
-  >(null);
-  const [showUnlicensedDetail, setShowUnlicensedDetail] = useState(false);
+  const [hoveredTarget, setHoveredTarget] =
+    useState<ProvinceInteractionTarget | null>(null);
+  const [pinnedTarget, setPinnedTarget] =
+    useState<ProvinceInteractionTarget | null>(null);
 
-  // Ekran boyutu ilk açılışta ölçüldüğünde haritayı uygun zoom ve 2D/3D moduna ayarla
+  // Geçiş süresini tetikleyen nedene göre belirle: hover = 300ms, oynatma = 400ms, filtre değişimi = 500ms
+  const prevFilterRef = useRef<MapFilter>(activeFilter);
+  const prevHourRef = useRef<number>(selectedHourIndex);
+  let transitionDurationMs = HOVER_TRANSITION_MS;
+  if (prevFilterRef.current !== activeFilter) {
+    transitionDurationMs = FILTER_TRANSITION_MS;
+  } else if (prevHourRef.current !== selectedHourIndex || isPlaying) {
+    transitionDurationMs = PLAYBACK_TRANSITION_MS;
+  }
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const width = el.clientWidth || window.innerWidth;
-    const default3D = width >= MOBILE_BREAKPOINT_PX;
-    setIs3D(default3D);
-    setViewState(getInitialViewState(width, default3D));
+    prevFilterRef.current = activeFilter;
+    prevHourRef.current = selectedHourIndex;
+  }, [activeFilter, selectedHourIndex]);
+
+  // Açılışta ve pencere boyutu değiştiğinde Türkiye'yi yeniden ekrana sığdır
+  useEffect(() => {
+    const updateSize = () => {
+      const el = containerRef.current;
+      const w = el?.clientWidth || window.innerWidth;
+      const h = el?.clientHeight || window.innerHeight;
+      const next3D = w >= MOBILE_BREAKPOINT_PX;
+      setIs3D(next3D);
+      setViewState(computeFittedViewState(w, h, next3D));
+    };
+
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Escape tuşuyla açık santral kartını kapat
   useEffect(() => {
-    if (!selectedPlantCard) return;
+    if (!pinnedTarget) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setSelectedPlantCard(null);
+        setPinnedTarget(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedPlantCard]);
+  }, [pinnedTarget]);
 
-  // Tıklanmış santral nesnesini bul
-  const selectedPlant = useMemo<LocatedPlantPoint | null>(() => {
-    if (!selectedPlantCard) return null;
-    return plants.find((p) => p.id === selectedPlantCard.plantId) ?? null;
-  }, [plants, selectedPlantCard]);
+  const provinceMeta = useMemo<ProvinceGeometryMeta>(() => {
+    return buildProvinceGeometryMeta(provincesGeoJson);
+  }, [provincesGeoJson]);
 
-  const selectedPlantCurrentMw = selectedPlant
-    ? (selectedPlant.hourlyMw[selectedHourIndex] ?? 0)
-    : 0;
+  // Tüm il × aktif kaynak dilim poligonlarını BİR KEZ oluştur (GPU üçgenleme bir kez çalışır)
+  const sliceInstances = useMemo<ProvinceSliceInstance[]>(() => {
+    if (!provinceSeriesByPlate || provinceMeta.polygonParts.length === 0) {
+      return [];
+    }
+    const items: ProvinceSliceInstance[] = [];
+    for (let idx = 0; idx < provinceMeta.polygonParts.length; idx++) {
+      const part = provinceMeta.polygonParts[idx];
+      const series = provinceSeriesByPlate.get(part.plate);
+      if (!series) continue;
+
+      const activeSourcesInProvince = new Set<SourceType>();
+      for (let h = 0; h < series.hours.length; h++) {
+        const bySrc = series.hours[h].bySource;
+        for (const src of DEFAULT_SOURCE_ORDER) {
+          if ((bySrc[src] ?? 0) > 0) {
+            activeSourcesInProvince.add(src);
+          }
+        }
+      }
+
+      for (const src of DEFAULT_SOURCE_ORDER) {
+        if (!activeSourcesInProvince.has(src)) continue;
+        items.push({
+          id: `${part.plate}-${idx}-${src}`,
+          plate: part.plate,
+          name: part.name,
+          source: src,
+          polygon: part.rings,
+          centroid: part.centroid,
+        });
+      }
+    }
+    return items;
+  }, [provinceMeta.polygonParts, provinceSeriesByPlate]);
+
+  const activeTarget = pinnedTarget ?? hoveredTarget;
+  const activeProvincePlate = activeTarget?.plate ?? null;
+
+  // Seçili saat, aktif filtre ve hover durumuna göre her ilin ve dilimin yükseklik/renk/sıralama metriklerini hesapla
+  const renderComputed = useMemo(() => {
+    const sliceMetricsMap = new Map<string, SliceVisualMetrics>();
+    const blockTopElevationByPlate = new Map<number, number>();
+    const baseFillColorByPlate = new Map<number, [number, number, number, number]>();
+    const totalRankByPlate = new Map<number, number>();
+    const filterRankByPlate = new Map<number, number>();
+    const filteredMwByPlate = new Map<number, number>();
+
+    if (!provinceSeriesByPlate) {
+      return {
+        sliceMetricsMap,
+        blockTopElevationByPlate,
+        baseFillColorByPlate,
+        totalRankByPlate,
+        filterRankByPlate,
+        filteredMwByPlate,
+        maxFilteredMw: 0,
+        topProvinceName: null as string | null,
+        topProvinceMw: 0,
+        nationalFilterTotalMw: 0,
+      };
+    }
+
+    const totalList: { plate: number; name: string; mw: number }[] = [];
+    const filterList: { plate: number; name: string; mw: number }[] = [];
+    let nationalFilterTotalMw = 0;
+
+    for (const [plate, series] of provinceSeriesByPlate.entries()) {
+      const hourSlice = series.hours[selectedHourIndex];
+      const totalMw = hourSlice?.totalMw ?? 0;
+      totalList.push({ plate, name: series.name, mw: totalMw });
+
+      let filtMw = 0;
+      if (hourSlice) {
+        for (const src of DEFAULT_SOURCE_ORDER) {
+          if (isSourceInFilter(src, activeFilter, sourceLabels)) {
+            filtMw += hourSlice.bySource[src] ?? 0;
+          }
+        }
+      }
+      filteredMwByPlate.set(plate, filtMw);
+      nationalFilterTotalMw += filtMw;
+      filterList.push({ plate, name: series.name, mw: filtMw });
+    }
+
+    totalList.sort((a, b) => b.mw - a.mw);
+    totalList.forEach((item, i) => {
+      if (item.mw >= 0.5) totalRankByPlate.set(item.plate, i + 1);
+    });
+
+    filterList.sort((a, b) => b.mw - a.mw);
+    filterList.forEach((item, i) => {
+      if (item.mw >= 0.5) filterRankByPlate.set(item.plate, i + 1);
+    });
+
+    const maxFilteredMw = filterList[0]?.mw ?? 0;
+    const topProvinceName =
+      maxFilteredMw >= 0.5 ? (filterList[0]?.name ?? null) : null;
+    const topProvinceMw = maxFilteredMw;
+
+    const elevationPerMw =
+      maxFilteredMw > 0 ? MAX_PROVINCE_BLOCK_ELEVATION_M / maxFilteredMw : 0;
+
+    const isSingleSource =
+      activeFilter !== "all" &&
+      activeFilter !== "renewable" &&
+      activeFilter !== "fossil";
+
+    for (const [plate, series] of provinceSeriesByPlate.entries()) {
+      const hourSlice = series.hours[selectedHourIndex];
+      const filtMw = filteredMwByPlate.get(plate) ?? 0;
+      const isHovered = activeProvincePlate === plate;
+      const isDimmed =
+        activeProvincePlate !== null && activeProvincePlate !== plate;
+
+      const opacityByte = isDimmed
+        ? Math.round(OTHER_PROVINCES_DIM_OPACITY * 255)
+        : Math.round(ACTIVE_PROVINCE_OPACITY * 255);
+
+      // 2B mod (veya mobil) ve taban katmanı rengi
+      if (!is3D) {
+        if (filtMw < 0.5) {
+          baseFillColorByPlate.set(plate, ZERO_SOURCE_PROVINCE_FILL_RGBA);
+        } else if (isSingleSource) {
+          const ratio = maxFilteredMw > 0 ? filtMw / maxFilteredMw : 0;
+          const [r, g, b] = computeSingleSourceShadeRgb(
+            activeFilter as SourceType,
+            ratio,
+            isHovered
+          );
+          baseFillColorByPlate.set(plate, [r, g, b, opacityByte]);
+        } else {
+          // Baskın kaynağı bul
+          let dominantSrc: SourceType = "natural_gas";
+          let dominantVal = -1;
+          if (hourSlice) {
+            for (const src of DEFAULT_SOURCE_ORDER) {
+              if (!isSourceInFilter(src, activeFilter, sourceLabels)) continue;
+              const val = hourSlice.bySource[src] ?? 0;
+              if (val > dominantVal) {
+                dominantVal = val;
+                dominantSrc = src;
+              }
+            }
+          }
+          const ratio = maxFilteredMw > 0 ? filtMw / maxFilteredMw : 0;
+          const [r, g, b] = computeSingleSourceShadeRgb(
+            dominantSrc,
+            0.35 + ratio * 0.65,
+            isHovered
+          );
+          baseFillColorByPlate.set(plate, [r, g, b, opacityByte]);
+        }
+      } else {
+        if (filtMw <= 0) {
+          baseFillColorByPlate.set(plate, ZERO_SOURCE_PROVINCE_FILL_RGBA);
+        } else if (filtMw < LOW_PROVINCE_THRESHOLD_MW) {
+          baseFillColorByPlate.set(plate, LOW_PROVINCE_FILL_RGBA);
+        } else {
+          baseFillColorByPlate.set(plate, PROVINCE_FILL_RGBA);
+        }
+      }
+
+      // 3B dilimleri: o ildeki en büyük pay en altta, yukarı doğru küçülen paylar
+      const sortedSources = [...DEFAULT_SOURCE_ORDER].sort((a, b) => {
+        const mwA =
+          isSourceInFilter(a, activeFilter, sourceLabels) && hourSlice
+            ? (hourSlice.bySource[a] ?? 0)
+            : 0;
+        const mwB =
+          isSourceInFilter(b, activeFilter, sourceLabels) && hourSlice
+            ? (hourSlice.bySource[b] ?? 0)
+            : 0;
+        if (Math.abs(mwB - mwA) > 1e-6) return mwB - mwA;
+        return (
+          DEFAULT_SOURCE_ORDER.indexOf(a) - DEFAULT_SOURCE_ORDER.indexOf(b)
+        );
+      });
+
+      const normalBlockHeightM =
+        filtMw <= 0
+          ? 0
+          : filtMw < LOW_PROVINCE_THRESHOLD_MW && activeFilter === "all"
+            ? Math.max(LOW_PROVINCE_BASE_ELEVATION_M, filtMw * elevationPerMw)
+            : filtMw * elevationPerMw;
+
+      const hoverLiftM =
+        is3D && isHovered && filtMw > 0
+          ? Math.max(HOVER_MIN_LIFT_M, normalBlockHeightM * HOVER_LIFT_RATIO)
+          : 0;
+
+      const heightMult = is3D && isHovered ? HOVER_HEIGHT_MULTIPLIER : 1.0;
+
+      let cumulativeZ = hoverLiftM;
+      let activeSliceIdx = 0;
+      let remainingMw = filtMw;
+
+      for (const src of sortedSources) {
+        const inFilter = isSourceInFilter(src, activeFilter, sourceLabels);
+        const srcMw = inFilter && hourSlice ? (hourSlice.bySource[src] ?? 0) : 0;
+
+        if (!is3D || srcMw <= 0.05) {
+          const [r, g, b] = SOURCE_PALETTE[src].rgb;
+          sliceMetricsMap.set(`${plate}-${src}`, {
+            baseElevationM: cumulativeZ,
+            sliceElevationM: 0,
+            scaleRatio: 1,
+            fillColor: [r, g, b, 0],
+          });
+          continue;
+        }
+
+        let rawSliceH = srcMw * elevationPerMw * heightMult;
+        if (
+          filtMw < LOW_PROVINCE_THRESHOLD_MW &&
+          activeFilter === "all" &&
+          filtMw > 0
+        ) {
+          rawSliceH =
+            (srcMw / filtMw) *
+            Math.max(LOW_PROVINCE_BASE_ELEVATION_M, filtMw * elevationPerMw) *
+            heightMult;
+        }
+
+        // En alttaki en büyük dilim (activeSliceIdx === 0) ilin %100 tam sınırındadır (scaleRatio = 1).
+        // Üstteki dilimler, kalan payın karekökü oranında kademeli teraslanarak 50° kamera açısında
+        // hem yandan hem üstten her kaynağın gerçek payıyla okunmasını sağlar.
+        let scaleRatio = 1.0;
+        if (!isSingleSource && activeSliceIdx > 0 && filtMw > 0) {
+          const remShare = Math.max(0, Math.min(1, remainingMw / filtMw));
+          const maxStepScale = Math.pow(0.84, activeSliceIdx);
+          scaleRatio = Math.max(
+            0.22,
+            Math.min(maxStepScale, Math.sqrt(remShare))
+          );
+        }
+
+        const baseZ = cumulativeZ + activeSliceIdx * 4;
+        const rgb = isSingleSource
+          ? computeSingleSourceShadeRgb(
+              src,
+              maxFilteredMw > 0 ? filtMw / maxFilteredMw : 0,
+              isHovered
+            )
+          : computeSliceSourceRgb(src, isHovered);
+
+        sliceMetricsMap.set(`${plate}-${src}`, {
+          baseElevationM: baseZ,
+          sliceElevationM: Math.max(120, rawSliceH),
+          scaleRatio,
+          fillColor: [rgb[0], rgb[1], rgb[2], opacityByte],
+        });
+
+        remainingMw = Math.max(0, remainingMw - srcMw);
+        cumulativeZ = baseZ + Math.max(120, rawSliceH);
+        activeSliceIdx++;
+      }
+
+      blockTopElevationByPlate.set(plate, cumulativeZ);
+    }
+
+    return {
+      sliceMetricsMap,
+      blockTopElevationByPlate,
+      baseFillColorByPlate,
+      totalRankByPlate,
+      filterRankByPlate,
+      filteredMwByPlate,
+      maxFilteredMw,
+      topProvinceName,
+      topProvinceMw,
+      nationalFilterTotalMw,
+    };
+  }, [
+    provinceSeriesByPlate,
+    selectedHourIndex,
+    activeFilter,
+    sourceLabels,
+    activeProvincePlate,
+    is3D,
+  ]);
 
   const handleZoom = useCallback((delta: number) => {
     setViewState((prev) => ({
       ...prev,
       zoom: Math.max(
         prev.minZoom ?? 3.5,
-        Math.min(prev.maxZoom ?? 11, (prev.zoom ?? 5.4) + delta)
+        Math.min(prev.maxZoom ?? 11.5, (prev.zoom ?? 5.4) + delta)
       ),
     }));
   }, []);
@@ -193,51 +861,104 @@ export const TurkeyMap = memo(function TurkeyMap({
       const next3D = !prev3D;
       setViewState((prevView) => ({
         ...prevView,
-        pitch: next3D ? DESKTOP_DEFAULT_PITCH : 0,
-        bearing: next3D ? prevView.bearing ?? 0 : 0,
+        pitch: next3D ? DEFAULT_3D_PITCH_DEG : 0,
+        bearing: next3D ? DEFAULT_3D_BEARING_DEG : 0,
       }));
       return next3D;
     });
   }, []);
 
   const handleResetView = useCallback(() => {
-    const width = containerRef.current?.clientWidth ?? window.innerWidth;
-    const default3D = width >= MOBILE_BREAKPOINT_PX;
+    const w = containerRef.current?.clientWidth ?? window.innerWidth;
+    const h = containerRef.current?.clientHeight ?? window.innerHeight;
+    const default3D = w >= MOBILE_BREAKPOINT_PX;
     setIs3D(default3D);
-    setViewState(getInitialViewState(width, default3D));
-    setSelectedPlantCard(null);
+    setViewState(computeFittedViewState(w, h, default3D));
+    setPinnedTarget(null);
+    setHoveredTarget(null);
   }, []);
 
-  const handlePlantHover = useCallback(
-    (info: PickingInfo<LocatedPlantPoint>) => {
-      const nextId = info.object?.id ?? null;
-      setHoveredPlantId((prev) => (prev === nextId ? prev : nextId));
+  const resolvePlateFromPickingInfo = useCallback(
+    (info: PickingInfo): number | null => {
+      if (!info.object) return null;
+      if (info.layer?.id === "turkey-province-stacked-blocks-layer") {
+        return (info.object as ProvinceSliceInstance).plate;
+      }
+      if (info.layer?.id === "turkey-provinces-base-layer") {
+        return (info.object as ProvinceFeature).properties?.plate ?? null;
+      }
+      return null;
     },
     []
   );
 
-  const handlePlantClick = useCallback(
-    (info: PickingInfo<LocatedPlantPoint>) => {
+  const handleDeckHover = useCallback(
+    (info: PickingInfo) => {
+      if (pinnedTarget) return;
+      const plate = resolvePlateFromPickingInfo(info);
       if (
-        info.object &&
+        plate !== null &&
         typeof info.x === "number" &&
         typeof info.y === "number"
       ) {
-        setSelectedPlantCard({
-          plantId: info.object.id,
-          x: info.x,
-          y: info.y,
+        setHoveredTarget((prev) => {
+          if (
+            prev &&
+            prev.plate === plate &&
+            Math.abs(prev.x - info.x) < 6 &&
+            Math.abs(prev.y - info.y) < 6
+          ) {
+            return prev;
+          }
+          return { plate, x: info.x, y: info.y };
         });
+      } else {
+        setHoveredTarget((prev) => (prev === null ? null : null));
       }
     },
-    []
+    [pinnedTarget, resolvePlateFromPickingInfo]
   );
 
-  // 1. Türkiye İl Sınırları Katmanı (Saat değişiminden ve santral seçiminden bağımsız memoize edilir)
-  const provincesLayer = useMemo(() => {
+  const handleDeckClick = useCallback(
+    (info: PickingInfo) => {
+      const plate = resolvePlateFromPickingInfo(info);
+      if (
+        plate !== null &&
+        typeof info.x === "number" &&
+        typeof info.y === "number"
+      ) {
+        setPinnedTarget((prev) =>
+          prev?.plate === plate ? null : { plate, x: info.x, y: info.y }
+        );
+      } else {
+        setPinnedTarget(null);
+      }
+    },
+    [resolvePlateFromPickingInfo]
+  );
+
+  // 1. Komşu Ülkeler Katmanı (/geo/neighbors.geojson)
+  const neighborsLayer = useMemo(() => {
+    if (!neighborsGeoJson) return null;
+    return new GeoJsonLayer({
+      id: "neighbors-countries-layer",
+      data: neighborsGeoJson,
+      pickable: false,
+      stroked: true,
+      filled: true,
+      lineWidthUnits: "pixels",
+      lineWidthMinPixels: 0.75,
+      getFillColor: NEIGHBOR_LAND_FILL_RGBA,
+      getLineColor: NEIGHBOR_BORDER_RGBA,
+      getLineWidth: 0.75,
+    });
+  }, [neighborsGeoJson]);
+
+  // 2. Türkiye İl Zemini (#101A2C) ve İl Sınırları (#3A5070, 1 px, opaklık 0,8)
+  const provincesBaseLayer = useMemo(() => {
     if (!provincesGeoJson) return null;
     return new GeoJsonLayer<ProvinceFeature["properties"]>({
-      id: "turkey-provinces-layer",
+      id: "turkey-provinces-base-layer",
       data: provincesGeoJson as unknown as GeoJSON.FeatureCollection<
         GeoJSON.Geometry,
         ProvinceFeature["properties"]
@@ -246,247 +967,512 @@ export const TurkeyMap = memo(function TurkeyMap({
       stroked: true,
       filled: true,
       lineWidthUnits: "pixels",
-      lineWidthMinPixels: 1,
-      getFillColor: (feature) => {
-        const isHovered = feature.properties?.plate === hoveredProvincePlate;
-        return isHovered ? [21, 31, 50, 255] : [11, 17, 30, 255];
-      },
-      getLineColor: (feature) => {
-        const isHovered = feature.properties?.plate === hoveredProvincePlate;
-        return isHovered ? [56, 189, 248, 170] : [30, 41, 59, 230];
-      },
-      getLineWidth: (feature) =>
-        feature.properties?.plate === hoveredProvincePlate ? 1.75 : 1,
-      updateTriggers: {
-        getFillColor: [hoveredProvincePlate],
-        getLineColor: [hoveredProvincePlate],
-        getLineWidth: [hoveredProvincePlate],
-      },
-      onHover: (info: PickingInfo<ProvinceFeature>) => {
-        const nextPlate = info.object?.properties?.plate ?? null;
-        setHoveredProvincePlate((prev) =>
-          prev === nextPlate ? prev : nextPlate
+      lineWidthMinPixels: PROVINCE_BORDER_WIDTH_PX,
+      getFillColor: (f) => {
+        const plate = f.properties?.plate;
+        return (
+          (plate !== undefined
+            ? renderComputed.baseFillColorByPlate.get(plate)
+            : undefined) ?? PROVINCE_FILL_RGBA
         );
       },
-    });
-  }, [provincesGeoJson, hoveredProvincePlate]);
-
-  // 2. Santral Taban Noktaları + 3D Sütun Katmanları
-  // `data: plants` referansı sabit tutularak deck.gl'in GPU üzerinde `transitions` ile
-  // sütun yüksekliklerini 60 fps akıcılıkla enterpole etmesi sağlanır.
-  const plantLayers = useMemo(() => {
-    if (plants.length === 0) return [];
-
-    const selectedId = selectedPlantCard?.plantId ?? null;
-    const colorTransitionMs = Math.min(260, transitionDurationMs);
-
-    // Taban noktaları (hem 2D hem 3D modda her santralin konumunu zeminde sabitler)
-    const baseScatterLayer = new ScatterplotLayer<LocatedPlantPoint>({
-      id: "plants-scatter-layer",
-      data: plants,
-      pickable: true,
-      stroked: true,
-      filled: true,
-      radiusUnits: "pixels",
-      lineWidthUnits: "pixels",
-      lineWidthMinPixels: 1,
-      radiusMinPixels: is3D ? 2.5 : 3,
-      radiusMaxPixels: is3D ? 14 : 26,
-      getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) => {
-        const mw = d.hourlyMw[selectedHourIndex] ?? 0;
-        return is3D
-          ? Math.max(3, computePlantRadiusPx(mw) * 0.55)
-          : computePlantRadiusPx(mw);
-      },
-      getFillColor: (d) => {
-        const mw = d.hourlyMw[selectedHourIndex] ?? 0;
-        const [r, g, b] = SOURCE_PALETTE[d.source].rgb;
-        const alpha = mw > 0 ? (is3D ? 200 : 235) : 105;
-        return [r, g, b, alpha];
-      },
-      getLineColor: (d) => {
-        if (d.id === selectedId || d.id === hoveredPlantId) {
-          return [248, 250, 252, 255];
-        }
-        return [6, 10, 18, 210];
-      },
-      getLineWidth: (d) =>
-        d.id === selectedId || d.id === hoveredPlantId ? 2.2 : 1,
+      getLineColor: PROVINCE_BORDER_RGBA,
+      getLineWidth: PROVINCE_BORDER_WIDTH_PX,
       transitions: {
-        getRadius: {
+        getFillColor: {
           duration: transitionDurationMs,
           easing: easeCubicOut,
         },
-        getFillColor: {
-          duration: colorTransitionMs,
-        },
       },
       updateTriggers: {
-        getRadius: [selectedHourIndex, is3D],
-        getFillColor: [selectedHourIndex, is3D],
-        getLineColor: [selectedId, hoveredPlantId],
-        getLineWidth: [selectedId, hoveredPlantId],
+        getFillColor: [
+          selectedHourIndex,
+          activeFilter,
+          activeProvincePlate,
+          is3D,
+        ],
       },
-      onHover: handlePlantHover,
-      onClick: handlePlantClick,
     });
+  }, [
+    provincesGeoJson,
+    renderComputed.baseFillColorByPlate,
+    selectedHourIndex,
+    activeFilter,
+    activeProvincePlate,
+    is3D,
+    transitionDurationMs,
+  ]);
 
-    if (!is3D) {
-      // 2D modda üretimi > 0 olan santraller için yumuşak geçişli dış ışıma halkası
-      const glowLayer = new ScatterplotLayer<LocatedPlantPoint>({
-        id: "plants-glow-layer",
-        data: plants,
-        pickable: false,
-        stroked: false,
-        filled: true,
-        radiusUnits: "pixels",
-        radiusMinPixels: 0,
-        radiusMaxPixels: 40,
-        getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => {
-          const mw = d.hourlyMw[selectedHourIndex] ?? 0;
-          return mw > 0 ? computePlantRadiusPx(mw) * 1.7 : 0;
-        },
-        getFillColor: (d) => {
-          const mw = d.hourlyMw[selectedHourIndex] ?? 0;
-          const [r, g, b] = SOURCE_PALETTE[d.source].rgb;
-          return [r, g, b, mw > 0 ? 42 : 0];
-        },
-        transitions: {
-          getRadius: {
-            duration: transitionDurationMs,
-            easing: easeCubicOut,
-          },
-          getFillColor: {
-            duration: colorTransitionMs,
-          },
-        },
-        updateTriggers: {
-          getRadius: [selectedHourIndex],
-          getFillColor: [selectedHourIndex],
-        },
-      });
-      return [glowLayer, baseScatterLayer];
-    }
+  // 3. Kıyı ve Ülke Sınırı (#4A6A90, 1,5 px)
+  const coastAndCountryBorderLayer = useMemo(() => {
+    if (provinceMeta.outerBorderPaths.length === 0) return null;
+    return new PathLayer<[number, number][]>({
+      id: "turkey-coast-country-border-layer",
+      data: provinceMeta.outerBorderPaths,
+      pickable: false,
+      widthUnits: "pixels",
+      widthMinPixels: COAST_COUNTRY_BORDER_WIDTH_PX,
+      capRounded: true,
+      jointRounded: true,
+      getPath: (d) => d,
+      getColor: COAST_COUNTRY_BORDER_RGBA,
+      getWidth: COAST_COUNTRY_BORDER_WIDTH_PX,
+    });
+  }, [provinceMeta.outerBorderPaths]);
 
-    // 3D Mod: Santral noktalarının üzerinde yükselen 3D üretim sütunları (ColumnLayer)
-    // diskResolution: 12 ve GPU `transitions` ile saatler arasında sinematik 60fps geçiş sağlanır.
-    const columnsLayer = new ColumnLayer<LocatedPlantPoint>({
-      id: "plants-column-layer",
-      data: plants,
-      pickable: true,
+  // 4. Üzerine Gelinen / Sabitlenen İlin Sınır Vurgusu (#6B8DB5, 2 px)
+  const hoveredProvinceFeature =
+    activeProvincePlate !== null
+      ? (provinceMeta.featureByPlate.get(activeProvincePlate) ?? null)
+      : null;
+
+  const hoveredProvinceBorderLayer = useMemo(() => {
+    if (!hoveredProvinceFeature) return null;
+    return new GeoJsonLayer<ProvinceFeature["properties"]>({
+      id: "turkey-hovered-province-border-layer",
+      data: hoveredProvinceFeature as unknown as GeoJSON.Feature<
+        GeoJSON.Geometry,
+        ProvinceFeature["properties"]
+      >,
+      pickable: false,
+      stroked: true,
+      filled: false,
+      lineWidthUnits: "pixels",
+      lineWidthMinPixels: PROVINCE_HOVER_BORDER_WIDTH_PX,
+      getLineColor: PROVINCE_HOVER_BORDER_RGBA,
+      getLineWidth: PROVINCE_HOVER_BORDER_WIDTH_PX,
+    });
+  }, [hoveredProvinceFeature]);
+
+  // 5. Katmanlı 3B İl Blokları (StackedSolidPolygonLayer)
+  const stackedBlocksLayer = useMemo(() => {
+    if (sliceInstances.length === 0) return null;
+    return new StackedSolidPolygonLayer<ProvinceSliceInstance>({
+      id: "turkey-province-stacked-blocks-layer",
+      data: sliceInstances,
+      pickable: is3D,
       extruded: true,
-      stroked: false,
-      diskResolution: 12,
-      radius: 4200,
-      elevationScale: 1,
+      filled: true,
+      wireframe: false,
       material: {
-        ambient: 0.55,
-        diffuse: 0.6,
-        shininess: 32,
-        specularColor: [255, 255, 255],
+        ambient: 0.52,
+        diffuse: 0.55,
+        shininess: 28,
+        specularColor: [45, 60, 85],
       },
-      getPosition: (d) => [d.lon, d.lat],
+      getPolygon: (d) => d.polygon,
+      getCentroid: (d) => d.centroid,
+      getBaseElevation: (d) =>
+        renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
+          ?.baseElevationM ?? 0,
       getElevation: (d) =>
-        computeColumnElevationMeters(d.hourlyMw[selectedHourIndex] ?? 0),
-      getFillColor: (d) => {
-        const mw = d.hourlyMw[selectedHourIndex] ?? 0;
-        const [r, g, b] = SOURCE_PALETTE[d.source].rgb;
-        if (d.id === selectedId) {
-          return [
-            Math.min(255, r + 35),
-            Math.min(255, g + 35),
-            Math.min(255, b + 35),
-            255,
-          ];
-        }
-        if (d.id === hoveredPlantId) {
-          return [
-            Math.min(255, r + 20),
-            Math.min(255, g + 20),
-            Math.min(255, b + 20),
-            250,
-          ];
-        }
-        const alpha = mw > 0 ? 232 : 0;
-        return [r, g, b, alpha];
-      },
+        renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
+          ?.sliceElevationM ?? 0,
+      getScaleRatio: (d) =>
+        renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
+          ?.scaleRatio ?? 1,
+      getFillColor: (d) =>
+        renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
+          ?.fillColor ?? [0, 0, 0, 0],
       transitions: {
+        getBaseElevation: {
+          duration: transitionDurationMs,
+          easing: easeCubicOut,
+        },
         getElevation: {
           duration: transitionDurationMs,
           easing: easeCubicOut,
         },
+        getScaleRatio: {
+          duration: transitionDurationMs,
+          easing: easeCubicOut,
+        },
         getFillColor: {
-          duration: colorTransitionMs,
+          duration: transitionDurationMs,
+          easing: easeCubicOut,
         },
       },
       updateTriggers: {
-        getElevation: [selectedHourIndex],
-        getFillColor: [selectedHourIndex, selectedId, hoveredPlantId],
+        getBaseElevation: [
+          selectedHourIndex,
+          activeFilter,
+          activeProvincePlate,
+          is3D,
+        ],
+        getElevation: [
+          selectedHourIndex,
+          activeFilter,
+          activeProvincePlate,
+          is3D,
+        ],
+        getScaleRatio: [
+          selectedHourIndex,
+          activeFilter,
+          activeProvincePlate,
+          is3D,
+        ],
+        getFillColor: [
+          selectedHourIndex,
+          activeFilter,
+          activeProvincePlate,
+          is3D,
+        ],
       },
-      onHover: handlePlantHover,
-      onClick: handlePlantClick,
+    });
+  }, [
+    sliceInstances,
+    is3D,
+    renderComputed.sliceMetricsMap,
+    selectedHourIndex,
+    activeFilter,
+    activeProvincePlate,
+    transitionDurationMs,
+  ]);
+
+  // 6. Her Bloğun Tepesinde İl Adı Etiketi (TextLayer, billboard; uzaktayken en çok üreten 15 il, zoom 7+'da hepsi)
+  const isAllLabelsZoom = (viewState.zoom ?? 0) >= PROVINCE_LABEL_ALL_MIN_ZOOM;
+
+  // Aktif filtrede 24 saatlik toplam üretime göre kararlı (stable) il sıralaması:
+  // Oynatma sırasında saat değişirken etiketlerin her saniye yer değiştirmesini önler.
+  const stableFilterRankByPlate = useMemo(() => {
+    const rankMap = new Map<number, number>();
+    if (!provinceSeriesByPlate) return rankMap;
+
+    const list: { plate: number; dailySumMw: number }[] = [];
+    for (const [plate, series] of provinceSeriesByPlate.entries()) {
+      let sum = 0;
+      for (let h = 0; h < series.hours.length; h++) {
+        const hourSlice = series.hours[h];
+        for (const src of DEFAULT_SOURCE_ORDER) {
+          if (isSourceInFilter(src, activeFilter, sourceLabels)) {
+            sum += hourSlice.bySource[src] ?? 0;
+          }
+        }
+      }
+      list.push({ plate, dailySumMw: sum });
+    }
+
+    list.sort((a, b) => b.dailySumMw - a.dailySumMw || a.plate - b.plate);
+    list.forEach((item, idx) => {
+      if (item.dailySumMw >= 1) {
+        rankMap.set(item.plate, idx + 1);
+      }
+    });
+    return rankMap;
+  }, [provinceSeriesByPlate, activeFilter, sourceLabels]);
+
+  const visiblePlateSet = useMemo(() => {
+    const candidates = provinceMeta.labels.filter((item) => {
+      if (activeProvincePlate === item.plate) return true;
+      if (isAllLabelsZoom) return true;
+      const stableRank = stableFilterRankByPlate.get(item.plate);
+      const filtMw = renderComputed.filteredMwByPlate.get(item.plate) ?? 0;
+      return (
+        stableRank !== undefined &&
+        stableRank <= PROVINCE_LABEL_TOP_COUNT &&
+        filtMw >= 1
+      );
     });
 
-    return [baseScatterLayer, columnsLayer];
+    candidates.sort((a, b) => {
+      if (a.plate === activeProvincePlate) return -1;
+      if (b.plate === activeProvincePlate) return 1;
+      const rA = stableFilterRankByPlate.get(a.plate) ?? 999;
+      const rB = stableFilterRankByPlate.get(b.plate) ?? 999;
+      return rA - rB;
+    });
+
+    const acceptedPlates = new Set<number>();
+
+    try {
+      const w =
+        containerRef.current?.clientWidth ||
+        (typeof window !== "undefined" ? window.innerWidth : 1280);
+      const h =
+        containerRef.current?.clientHeight ||
+        (typeof window !== "undefined" ? window.innerHeight : 800);
+      const vp = new WebMercatorViewport({
+        width: w,
+        height: h,
+        longitude: viewState.longitude,
+        latitude: viewState.latitude,
+        zoom: viewState.zoom,
+        pitch: viewState.pitch ?? 0,
+        bearing: viewState.bearing ?? 0,
+      });
+
+      const placedBoxes: { x: number; y: number; halfW: number }[] = [];
+      for (const item of candidates) {
+        const topZ = is3D
+          ? (renderComputed.blockTopElevationByPlate.get(item.plate) ?? 0) +
+            PROVINCE_LABEL_ELEVATION_PADDING_M
+          : 0;
+        const [sx, sy] = vp.project([
+          item.position[0],
+          item.position[1],
+          topZ,
+        ]);
+        const halfW = item.name.length * 4.4 + 12;
+
+        if (item.plate === activeProvincePlate) {
+          placedBoxes.push({ x: sx, y: sy, halfW });
+          acceptedPlates.add(item.plate);
+          continue;
+        }
+
+        const collides = placedBoxes.some(
+          (box) =>
+            Math.abs(sx - box.x) < halfW + box.halfW &&
+            Math.abs(sy - box.y) < 22
+        );
+        if (!collides) {
+          placedBoxes.push({ x: sx, y: sy, halfW });
+          acceptedPlates.add(item.plate);
+        }
+      }
+      return acceptedPlates;
+    } catch {
+      for (const item of candidates) {
+        acceptedPlates.add(item.plate);
+      }
+      return acceptedPlates;
+    }
   }, [
-    plants,
+    provinceMeta.labels,
+    activeProvincePlate,
+    isAllLabelsZoom,
+    stableFilterRankByPlate,
+    renderComputed.filteredMwByPlate,
+    renderComputed.blockTopElevationByPlate,
+    viewState,
     is3D,
+  ]);
+
+  // TextLayer'a her zaman sabit 81 il dizisi (provinceMeta.labels) verilir:
+  // deck.gl MultiIconLayer'da değişken uzunluklu dizilerin (data) değişmesi sırasında oluşan
+  // karakter tamponu kayması ("Kahramanmaraş" -> "Kahra", "Mersin" -> "Mers") böylece kökten önlenir.
+  const provinceLabelsLayer = useMemo(() => {
+    if (provinceMeta.labels.length === 0) return null;
+    return new TextLayer<ProvinceLabelItem>({
+      id: "turkey-province-top-labels-layer",
+      data: provinceMeta.labels,
+      pickable: false,
+      billboard: true,
+      characterSet: "auto",
+      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+      fontWeight: 700,
+      sizeUnits: "pixels",
+      parameters: {
+        depthCompare: "always",
+      },
+      getPosition: (d) => {
+        const topZ = is3D
+          ? (renderComputed.blockTopElevationByPlate.get(d.plate) ?? 0) +
+            PROVINCE_LABEL_ELEVATION_PADDING_M
+          : 0;
+        return [d.position[0], d.position[1], topZ];
+      },
+      getText: (d) => d.name,
+      getSize: (d) => {
+        if (!visiblePlateSet.has(d.plate)) return 0;
+        return d.plate === activeProvincePlate
+          ? PROVINCE_LABEL_HOVER_FONT_SIZE_PX
+          : PROVINCE_LABEL_FONT_SIZE_PX;
+      },
+      getColor: (d) => {
+        if (!visiblePlateSet.has(d.plate)) return [0, 0, 0, 0];
+        if (
+          activeProvincePlate !== null &&
+          d.plate !== activeProvincePlate
+        ) {
+          return PROVINCE_LABEL_DIM_COLOR_RGBA;
+        }
+        return PROVINCE_LABEL_COLOR_RGBA;
+      },
+      getTextAnchor: "middle",
+      getAlignmentBaseline: "bottom",
+      fontSettings: { sdf: true },
+      outlineWidth: 2.5,
+      outlineColor: PROVINCE_LABEL_OUTLINE_RGBA,
+      transitions: {
+        getPosition: {
+          duration: transitionDurationMs,
+          easing: easeCubicOut,
+        },
+      },
+      updateTriggers: {
+        getPosition: [
+          selectedHourIndex,
+          activeFilter,
+          activeProvincePlate,
+          is3D,
+        ],
+        getSize: [visiblePlateSet, activeProvincePlate],
+        getColor: [visiblePlateSet, activeProvincePlate],
+      },
+    });
+  }, [
+    provinceMeta.labels,
+    visiblePlateSet,
+    is3D,
+    renderComputed.blockTopElevationByPlate,
+    activeProvincePlate,
     selectedHourIndex,
+    activeFilter,
     transitionDurationMs,
-    hoveredPlantId,
-    selectedPlantCard?.plantId,
-    handlePlantHover,
-    handlePlantClick,
   ]);
 
   const layers = useMemo(() => {
-    if (!provincesLayer) return [];
-    return [provincesLayer, ...plantLayers];
-  }, [provincesLayer, plantLayers]);
+    const result = [];
+    if (neighborsLayer) result.push(neighborsLayer);
+    if (provincesBaseLayer) result.push(provincesBaseLayer);
+    if (coastAndCountryBorderLayer) result.push(coastAndCountryBorderLayer);
+    if (hoveredProvinceBorderLayer) result.push(hoveredProvinceBorderLayer);
+    if (stackedBlocksLayer) result.push(stackedBlocksLayer);
+    if (provinceLabelsLayer) result.push(provinceLabelsLayer);
+    return result;
+  }, [
+    neighborsLayer,
+    provincesBaseLayer,
+    coastAndCountryBorderLayer,
+    hoveredProvinceBorderLayer,
+    stackedBlocksLayer,
+    provinceLabelsLayer,
+  ]);
 
-  const isPlayback = mode === "playback";
-  const plantsDayDate = snapshot?.plants_day.date ?? "";
-  const plantsDayDateTr = plantsDayDate ? formatLocalDate(plantsDayDate) : "";
+  // Yüzen il paneli için seçili ilin verisi
+  const activeProvinceSeries =
+    activeProvincePlate !== null && provinceSeriesByPlate
+      ? (provinceSeriesByPlate.get(activeProvincePlate) ?? null)
+      : null;
+  const activeProvinceHourSlice: ProvinceHourlySlice | null =
+    activeProvinceSeries?.hours[selectedHourIndex] ?? null;
+
   const selectedHourParts = selectedHourTimestamp
     ? formatTimestampParts(selectedHourTimestamp)
     : null;
 
-  const plantsFreshness = snapshot
-    ? evaluateFreshness(snapshot.plants_day.last_hour_ts, 36, 48)
-    : null;
+  // Aktif filtre bilgisi (paneldeki "Ölçek: ..." notu ve il panelindeki filtre özeti için)
+  const filterMeta = useMemo(() => {
+    if (activeFilter === "all") {
+      return {
+        label: "Toplam Üretim",
+        colorHex: "#38BDF8",
+      };
+    }
+    if (activeFilter === "renewable") {
+      return {
+        label: "Yenilenebilir",
+        colorHex: "#10B981",
+      };
+    }
+    if (activeFilter === "fossil") {
+      return {
+        label: "Fosil",
+        colorHex: "#FB923C",
+      };
+    }
+    return {
+      label:
+        sourceLabels?.sources[activeFilter]?.label ??
+        SOURCE_PALETTE[activeFilter].fallbackLabel,
+      colorHex: SOURCE_PALETTE[activeFilter].hex,
+    };
+  }, [activeFilter, sourceLabels]);
 
-  const unlicensed = snapshot?.unlicensed_solar;
-  const displayedHourTotalMw =
-    selectedHourTotalMw ?? snapshot?.plants_day.total_mw_last_hour ?? 0;
+  const activeFilterRankInfo = useMemo<FilterProvinceRankInfo | null>(() => {
+    if (activeProvincePlate === null || activeFilter === "all") return null;
+    const provinceFilterMw =
+      renderComputed.filteredMwByPlate.get(activeProvincePlate) ?? 0;
+    const nationalFilterSharePct =
+      renderComputed.nationalFilterTotalMw > 0
+        ? (provinceFilterMw / renderComputed.nationalFilterTotalMw) * 100
+        : 0;
+    const provinceFilterRank =
+      renderComputed.filterRankByPlate.get(activeProvincePlate) ?? null;
+
+    return {
+      filterLabel: filterMeta.label,
+      filterColorHex: filterMeta.colorHex,
+      provinceFilterMw,
+      nationalFilterSharePct,
+      provinceFilterRank,
+    };
+  }, [
+    activeProvincePlate,
+    activeFilter,
+    renderComputed.filteredMwByPlate,
+    renderComputed.nationalFilterTotalMw,
+    renderComputed.filterRankByPlate,
+    filterMeta,
+  ]);
+
+  const izmirScreenAttr = useMemo(() => {
+    const centroid = provinceMeta.centroidByPlate.get(35);
+    if (!centroid) return undefined;
+    try {
+      const w =
+        containerRef.current?.clientWidth ||
+        (typeof window !== "undefined" ? window.innerWidth : 1280);
+      const h =
+        containerRef.current?.clientHeight ||
+        (typeof window !== "undefined" ? window.innerHeight : 800);
+      const vp = new WebMercatorViewport({
+        width: w,
+        height: h,
+        longitude: viewState.longitude,
+        latitude: viewState.latitude,
+        zoom: viewState.zoom,
+        pitch: viewState.pitch ?? 0,
+        bearing: viewState.bearing ?? 0,
+      });
+      const izmirTopZ = renderComputed.blockTopElevationByPlate.get(35) ?? 30000;
+      const [sx, sy] = vp.project([
+        centroid[0],
+        centroid[1],
+        izmirTopZ * 0.65,
+      ]);
+      return `${Math.round(sx)},${Math.round(sy)}`;
+    } catch {
+      return undefined;
+    }
+  }, [
+    provinceMeta.centroidByPlate,
+    renderComputed.blockTopElevationByPlate,
+    viewState,
+  ]);
 
   return (
     <main
       ref={containerRef}
-      aria-label="Türkiye santral üretim haritası"
+      data-izmir-screen={izmirScreenAttr}
+      aria-label="Türkiye il düzeyinde katmanlı enerji üretimi haritası"
       onContextMenu={(e) => e.preventDefault()}
-      className="relative flex-1 min-h-[380px] w-full overflow-hidden bg-[#060A12] select-none"
+      onMouseLeave={() => {
+        if (!pinnedTarget) setHoveredTarget(null);
+      }}
+      style={{ backgroundColor: SEA_BACKGROUND_HEX }}
+      className="fixed inset-0 h-dvh w-screen overflow-hidden select-none"
     >
-      {/* Harita Yükleniyor Durumu */}
       {loading && (
         <div
           role="status"
           aria-live="polite"
-          className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#060A12]/90 backdrop-blur-sm"
+          style={{ backgroundColor: `${SEA_BACKGROUND_HEX}E6` }}
+          className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 backdrop-blur-sm"
         >
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#1E293B] border-t-[#10B981]" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-[#38BDF8]" />
           <p className="font-mono-data text-xs text-[#94A3B8]">
-            Türkiye il sınırları ve santral verileri yükleniyor…
+            İl bazında enerji üretim blokları hazırlanıyor…
           </p>
         </div>
       )}
 
-      {/* Veri Yok Durumu */}
-      {!loading && (!provincesGeoJson || plants.length === 0) && (
+      {!loading && !provincesGeoJson && (
         <div
           role="status"
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-[#060A12] p-6 text-center"
+          style={{ backgroundColor: SEA_BACKGROUND_HEX }}
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 p-6 text-center"
         >
           <AlertTriangle
             className="h-8 w-8 text-[#F59E0B]"
@@ -496,23 +1482,19 @@ export const TurkeyMap = memo(function TurkeyMap({
             Harita verisi bulunamadı
           </p>
           <p className="max-w-md text-xs text-[#94A3B8]">
-            Santral konumları veya il sınırları verisi şu anda görüntülenemiyor.
+            İl sınırları veya üretim verisi şu anda görüntülenemiyor.
           </p>
         </div>
       )}
 
-      {/* deck.gl Harita Kanvası */}
       <DeckGL
         views={new MapView({ id: "turkey-map", repeat: false })}
         viewState={viewState}
         onViewStateChange={({ viewState: nextViewState }) => {
           setViewState(nextViewState as MapViewState);
         }}
-        onClick={(info: PickingInfo) => {
-          if (!info.object || info.layer?.id === "turkey-provinces-layer") {
-            setSelectedPlantCard(null);
-          }
-        }}
+        onHover={handleDeckHover}
+        onClick={handleDeckClick}
         controller={{
           dragRotate: true,
           touchRotate: true,
@@ -527,134 +1509,27 @@ export const TurkeyMap = memo(function TurkeyMap({
         }
       />
 
-      {/* Sol Üst Yüzen Rozetler: Santral Verisi Tarihi + Lisanssız Güneş Bilgi Notu */}
-      {snapshot && (
-        <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-col items-start gap-2 sm:top-4 sm:left-5 sm:max-w-md">
-          {/* Zorunlu "Santral verisi: [plants_day.date]" etiketi */}
-          <div
-            className={`pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border bg-[#0D1422]/90 px-3 py-2 shadow-lg backdrop-blur-md transition-colors ${
-              isPlayback ? "border-[#38BDF8]/50" : "border-[#1E293B]"
-            }`}
-          >
-            <div className="flex items-center gap-1.5 text-xs font-medium text-[#F8FAFC]">
-              <Calendar
-                className="h-3.5 w-3.5 shrink-0 text-[#38BDF8]"
-                aria-hidden="true"
-              />
-              <span>
-                Santral verisi:{" "}
-                <strong className="font-mono-data font-semibold text-[#38BDF8] tabular-nums">
-                  {plantsDayDate}
-                </strong>{" "}
-                <span className="font-mono-data text-[#94A3B8] tabular-nums">
-                  ({plantsDayDateTr}
-                  {selectedHourParts ? ` · ${selectedHourParts.hour}` : ""})
-                </span>
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 border-l border-[#1E293B] pl-2 font-mono-data text-[11px] text-[#94A3B8] tabular-nums">
-              <span>
-                {isPlayback ? "Seçili saat:" : "Son saat:"}{" "}
-                <strong className="text-[#F8FAFC]">
-                  {formatMw(displayedHourTotalMw)}
-                </strong>
-              </span>
-              <span>·</span>
-              <span title="Haritada koordinatı eşleşen santral sayısı / toplam santral">
-                Haritada:{" "}
-                <strong className="text-[#F8FAFC]">
-                  {formatNumber(plants.length)}
-                </strong>{" "}
-                / {formatNumber(totalPlantsInCatalog)} santral
-              </span>
-            </div>
-
-            {plantsFreshness && plantsFreshness.level !== "fresh" && (
-              <Badge
-                variant={
-                  plantsFreshness.level === "error" ? "error" : "warning"
-                }
-                className="tabular-nums"
-              >
-                <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                <span>Santral verisi {plantsFreshness.label}</span>
-              </Badge>
-            )}
-          </div>
-
-          {/* Zorunlu Lisanssız Güneş Bilgi Notu */}
-          {unlicensed && (
-            <div className="pointer-events-auto rounded-lg border border-[#FACC15]/30 bg-[#0D1422]/90 px-3 py-2 text-xs shadow-lg backdrop-blur-md">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-1.5 font-medium text-[#F8FAFC]">
-                  <Sun
-                    className="h-3.5 w-3.5 shrink-0 text-[#FACC15]"
-                    aria-hidden="true"
-                  />
-                  <span>
-                    Lisanssız güneş bilgi notu{" "}
-                    <span className="font-mono-data text-[#FACC15] tabular-nums">
-                      ({formatMonthLabel(unlicensed.month)})
-                    </span>
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowUnlicensedDetail((v) => !v)}
-                  className="inline-flex min-h-[28px] items-center gap-1 rounded px-1.5 text-[11px] text-[#94A3B8] hover:bg-[#151F32] hover:text-[#F8FAFC] sm:hidden"
-                  aria-expanded={showUnlicensedDetail}
-                >
-                  <Info className="h-3 w-3" aria-hidden="true" />
-                  <span>{showUnlicensedDetail ? "Gizle" : "Detay"}</span>
-                </button>
-              </div>
-
-              <div
-                className={`mt-1 text-[11px] leading-relaxed text-[#94A3B8] tabular-nums ${
-                  showUnlicensedDetail ? "block" : "hidden sm:block"
-                }`}
-              >
-                Aylık ort.{" "}
-                <strong className="font-mono-data text-[#F8FAFC]">
-                  {formatMw(unlicensed.avg_mw)}
-                </strong>{" "}
-                · Öğlen tepe{" "}
-                <strong className="font-mono-data text-[#F8FAFC]">
-                  {formatMw(unlicensed.peak_mw)}
-                </strong>
-                .{" "}
-                <span className="text-[#64748B]">
-                  Gerçek zamanlı lisanslı üretim sayaçlarına dahil değildir
-                  (gecikmeli yayımlanır).
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Sağ Alt Harita Kontrolleri: 2D / 3D Geçişi + Yakınlaştırma + Sıfırlama */}
       <div
         aria-label="Harita görünüm ve yakınlaştırma kontrolleri"
-        className="absolute right-3 bottom-3 z-10 flex flex-col gap-1.5 sm:right-5 sm:bottom-4"
+        className="pointer-events-auto fixed right-2.5 bottom-24 z-20 flex flex-col gap-1.5 md:right-4 md:bottom-4"
       >
         <button
           type="button"
           onClick={handleToggle2D3D}
           aria-pressed={is3D}
           aria-label={
-            is3D ? "2B düz harita görünümüne geç" : "3B sütun görünümüne geç"
+            is3D ? "2B düz harita görünümüne geç" : "3B blok görünümüne geç (50°)"
           }
           title={
             is3D
-              ? "3D sütun görünümü aktif (2D görünüm için tıkla)"
-              : "2D düz görünüm aktif (3D sütunlar için tıkla)"
+              ? "3D blok görünümü aktif (50° eğim). 2D için tıkla."
+              : "2D düz görünüm aktif. 3D bloklar için tıkla."
           }
-          className={`flex h-11 w-11 flex-col items-center justify-center rounded-lg border font-mono-data text-[11px] font-bold shadow-md backdrop-blur-md transition-colors focus-visible:outline-2 focus-visible:outline-[#38BDF8] ${
+          className={`flex h-10 w-10 flex-col items-center justify-center rounded-xl border font-mono-data text-[10px] font-bold shadow-xl backdrop-blur-xl transition-all focus-visible:outline-2 focus-visible:outline-[#38BDF8] md:h-11 md:w-11 ${
             is3D
-              ? "border-[#38BDF8]/60 bg-[#0D1422]/95 text-[#38BDF8] hover:bg-[#151F32]"
-              : "border-[#1E293B] bg-[#0D1422]/90 text-[#94A3B8] hover:border-[#334155] hover:bg-[#151F32] hover:text-[#F8FAFC]"
+              ? "border-[#38BDF8]/60 bg-[#0A1324]/95 text-[#38BDF8]"
+              : "border-white/12 bg-[#060B14]/82 text-[#94A3B8] hover:border-white/25 hover:bg-[#0D1628]/90 hover:text-[#F8FAFC]"
           }`}
         >
           {is3D ? (
@@ -662,7 +1537,7 @@ export const TurkeyMap = memo(function TurkeyMap({
           ) : (
             <Layers className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          <span className="leading-none">{is3D ? "3D" : "2D"}</span>
+          <span className="mt-0.5 leading-none">{is3D ? "3D" : "2D"}</span>
         </button>
 
         <button
@@ -670,7 +1545,7 @@ export const TurkeyMap = memo(function TurkeyMap({
           onClick={() => handleZoom(0.65)}
           aria-label="Haritayı yakınlaştır"
           title="Yakınlaştır"
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#1E293B] bg-[#0D1422]/90 text-[#F8FAFC] shadow-md backdrop-blur-md transition-colors hover:border-[#334155] hover:bg-[#151F32] focus-visible:outline-2 focus-visible:outline-[#38BDF8]"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-[#060B14]/82 text-[#F8FAFC] shadow-xl backdrop-blur-xl transition-colors hover:border-white/25 hover:bg-[#0D1628]/90 focus-visible:outline-2 focus-visible:outline-[#38BDF8] md:h-11 md:w-11"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -679,7 +1554,7 @@ export const TurkeyMap = memo(function TurkeyMap({
           onClick={() => handleZoom(-0.65)}
           aria-label="Haritayı uzaklaştır"
           title="Uzaklaştır"
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#1E293B] bg-[#0D1422]/90 text-[#F8FAFC] shadow-md backdrop-blur-md transition-colors hover:border-[#334155] hover:bg-[#151F32] focus-visible:outline-2 focus-visible:outline-[#38BDF8]"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-[#060B14]/82 text-[#F8FAFC] shadow-xl backdrop-blur-xl transition-colors hover:border-white/25 hover:bg-[#0D1628]/90 focus-visible:outline-2 focus-visible:outline-[#38BDF8] md:h-11 md:w-11"
         >
           <Minus className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -687,110 +1562,37 @@ export const TurkeyMap = memo(function TurkeyMap({
           type="button"
           onClick={handleResetView}
           aria-label="Harita görünümünü sıfırla"
-          title="Türkiye görünümünü ve eğimi sıfırla"
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#1E293B] bg-[#0D1422]/90 text-[#94A3B8] shadow-md backdrop-blur-md transition-colors hover:border-[#334155] hover:bg-[#151F32] hover:text-[#F8FAFC] focus-visible:outline-2 focus-visible:outline-[#38BDF8]"
+          title="Türkiye görünümünü sıfırla"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/12 bg-[#060B14]/82 text-[#94A3B8] shadow-xl backdrop-blur-xl transition-colors hover:border-white/25 hover:bg-[#0D1628]/90 hover:text-[#F8FAFC] focus-visible:outline-2 focus-visible:outline-[#38BDF8] md:h-11 md:w-11"
         >
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 
-      {/* Sol Alt: Sütun / Nokta Ölçeği ve Kamera Kontrol İpucu */}
-      {sourceLabels && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10 hidden max-w-2xl rounded-lg border border-[#1E293B] bg-[#0D1422]/88 px-3 py-2 text-[11px] shadow-lg backdrop-blur-md md:block sm:left-5 sm:bottom-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-semibold uppercase tracking-wider text-[#94A3B8]">
-              {is3D ? "3D Sütun yüksekliği (√MW)" : "Nokta boyutu (√MW)"} · Saat{" "}
-              <span className="font-mono-data text-[#F8FAFC] tabular-nums">
-                {selectedHourParts?.hour ?? "23:00"}
-              </span>
-              :
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-mono-data text-[#94A3B8] tabular-nums">
-              <span className="inline-block h-2 w-2 rounded-full bg-[#94A3B8]" />
-              5–25 MW
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-mono-data text-[#94A3B8] tabular-nums">
-              <span className="inline-block h-3 w-3 rounded-full bg-[#94A3B8]" />
-              250 MW
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-mono-data text-[#94A3B8] tabular-nums">
-              <span className="inline-block h-4 w-4 rounded-full bg-[#94A3B8]" />
-              1.500+ MW
-            </span>
-            <span className="border-l border-[#1E293B] pl-3 text-[#64748B]">
-              Detay: <strong className="text-[#94A3B8]">Sol tık</strong> · Eğ /
-              döndür: <strong className="text-[#94A3B8]">Sağ tık</strong> ·
-              Oynat: <strong className="text-[#94A3B8]">Boşluk / ← →</strong>
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Tıklayınca Açılan Santral Bilgi Kartı (Ad, Kaynak Türkçe Etiketi, Kurulu Güç, O Saatteki MW) */}
-      {selectedPlant && selectedPlantCard && (
-        <div
-          role="dialog"
-          aria-label={`${selectedPlant.name} santral bilgisi`}
-          style={{
-            left: Math.min(
-              Math.max(12, selectedPlantCard.x + 14),
-              (containerRef.current?.clientWidth ?? 360) - 276
-            ),
-            top: Math.min(
-              Math.max(12, selectedPlantCard.y - 16),
-              (containerRef.current?.clientHeight ?? 380) - 180
-            ),
+      {/* Üzerine Gelince / Tıklayınca Açılan Yüzen İl Paneli */}
+      {activeTarget && activeProvinceSeries && activeProvinceHourSlice && (
+        <ProvinceFloatingPanel
+          plate={activeProvinceSeries.plate}
+          provinceName={activeProvinceSeries.name}
+          hourSlice={activeProvinceHourSlice}
+          totalRankInTurkey={
+            renderComputed.totalRankByPlate.get(activeProvinceSeries.plate) ??
+            null
+          }
+          hourLabel={selectedHourParts?.hour ?? "23:00"}
+          sourceLabels={sourceLabels}
+          activeFilter={activeFilter}
+          filterRankInfo={activeFilterRankInfo}
+          screenX={activeTarget.x}
+          screenY={activeTarget.y}
+          containerWidth={containerRef.current?.clientWidth ?? 1280}
+          containerHeight={containerRef.current?.clientHeight ?? 800}
+          isPinned={pinnedTarget !== null}
+          onClose={() => {
+            setPinnedTarget(null);
+            setHoveredTarget(null);
           }}
-          className="pointer-events-auto absolute z-30 w-64 rounded-lg border border-[#38BDF8]/50 bg-[#0D1422]/95 p-3.5 text-xs shadow-2xl backdrop-blur-md"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-display text-sm font-bold leading-snug text-[#F8FAFC]">
-              {selectedPlant.name}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setSelectedPlantCard(null)}
-              aria-label="Santral kartını kapat"
-              className="-mt-1 -mr-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#94A3B8] transition-colors hover:bg-[#151F32] hover:text-[#F8FAFC]"
-            >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* Kaynak (Türkçe etiket) */}
-          <div className="mt-1.5 flex items-center gap-1.5">
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-sm"
-              style={{
-                backgroundColor: SOURCE_PALETTE[selectedPlant.source].hex,
-              }}
-              aria-hidden="true"
-            />
-            <span className="font-medium text-[#F8FAFC]">
-              {selectedPlant.sourceLabel}
-            </span>
-          </div>
-
-          {/* O saatteki MW ve Kurulu Güç (tr-TR biçiminde) */}
-          <div className="mt-2.5 space-y-1.5 border-t border-[#1E293B] pt-2.5 tabular-nums">
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">
-                Üretim ({selectedHourParts?.hour ?? "23:00"}):
-              </span>
-              <span className="font-mono-data text-sm font-bold text-[#F8FAFC]">
-                {formatMw(selectedPlantCurrentMw)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">Kurulu güç:</span>
-              <span className="font-mono-data font-medium text-[#F8FAFC]">
-                {selectedPlant.capacityMw !== null
-                  ? formatMw(selectedPlant.capacityMw)
-                  : "bilinmiyor"}
-              </span>
-            </div>
-          </div>
-        </div>
+        />
       )}
     </main>
   );

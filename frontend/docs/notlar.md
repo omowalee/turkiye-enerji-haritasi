@@ -65,3 +65,23 @@
    - **Oynatma Modu:** Sayaçlar, harita ve seçili saat aynı güne (`plants_day.date`) ve aynı saate senkronize olur; toplam MW, yenilenebilir payı (`source_labels.json` `renewable` alanına göre), Akkuyu eşdeğeri (`mw / 1200`) ve PTF (`ptf_tl_mwh[saat]`) `mix_24h.plants_day` serisinden hesaplanır.
 3. **24 Saatlik Zaman Çubuğu (`src/components/PlaybackBar.tsx`):** Altta oynat/duraklat, hız seçimi (`1×`, `2×`, `4×`), 24 saat işaretli mini üretim profilli sürüklenebilir imleç ve klavye kısayolları (`Boşluk` = oynat/duraklat, `←`/`→` = 1 saat geri/ileri) eklendi; gün sonunda (`23:00`) başa (`00:00`) sarıp durur, döngüye girmez.
 4. **Sinematik 60 FPS Akıcılık (`src/components/ui/animated-value.tsx`, `src/components/TurkeyMap.tsx`):** Sütun yükseklikleri ve nokta yarıçapları `deck.gl` GPU `transitions` (cubic-out, süre = adım süresi) ile yumuşak geçer; sayaç rakamları React yeniden render'ı tetiklemeden doğrudan DOM `requestAnimationFrame` ile yuvarlanarak değişir.
+
+---
+
+## 6. Dördüncü Adım — Görsel Yön Değişikliği: "Türkiye'nin Enerji Işıkları"
+
+1. **Tam Ekran (Full-Bleed) Gece Haritası ve Komşu Ülkeler (`src/components/TurkeyMap.tsx`):** Harita tüm ekranı (`fixed inset-0 h-dvh w-screen`) kaplayacak şekilde derin gece mavisi (`#03060C`), `/geo/neighbors.geojson` (Natural Earth) sönük komşu ülke dolgusu (`#050911`), Türkiye çok koyu il dolgusu (`#080D18`), ince sınırlar ve kenar karartması (vignette) ile yeniden kuruldu.
+2. **İki Katmanlı Parlayan Işıklar ve Toplamsal Harmanlama (Varsayılan 2D Görünüm):** Her santral geniş yarıçaplı düşük opaklıklı **Hale** (`plants-halo-layer`) ve merkeze doğru beyaza yakınlaşan parlak **Çekirdek** (`plants-core-layer`) katmanlarıyla çizildi. `@luma.gl/core` `ADDITIVE_BLEND_PARAMETERS` (`src-alpha` + `one`) ile üst üste binen ışıkların parlaklığı toplandı; yarıçap `√MW` ile ölçeklenerek daire alanının doğrudan `MW` ile orantılı olması sağlandı (`0 MW` santraller sönük köz noktası olarak kalır, sabah yanar).
+3. **Yenilenen 3D Sütun Görünümü (`≥ 50 MW`):** Sağ alttaki `2D / 3D` düğmesiyle geçilen 3D görünümde kamera `58°` eğim ve biraz daha yakın zoom'a geçer; yalnızca `50 MW ve üstü` santraller doğrusal yükseklik ölçeği (`mw * 75` m) ve `LightingEffect` (`AmbientLight` + 2 `DirectionalLight`) ile sütun olarak yükselir, küçükler parlayan nokta olarak kalır.
+4. **Yarı Saydam Koyu Cam Paneller (`TopLeftHud.tsx`, `SourceStrip.tsx`, `InfoDrawer.tsx`, `PlaybackBar.tsx`):**
+   - Sol üstte kompakt cam panel: küçük başlık, mod seçici (`Canlı` / `Oynatma`), büyük rakamla toplam MW, yenilenebilir yüzdesi, saat, `"Lisanslı yurt içi üretim"` etiketi ve altında 11 dilimli yatay kaynak şeridi (dilim üzerine gelince kaynak adı, MW, `%` ve Akkuyu eşdeğeri).
+   - Sağ üstte tazelik rozeti ve `"i"` bilgi çekmecesi (santral tarihi, lisanssız güneş notu, ölçek açıklaması, santral sayısı ve atıflar).
+   - Altta `"Döngü"` (`isLooping`) düğmeli ince oynatma çubuğu; mobilde (`< 768px`) üstte tek satırlık özet ve alttan açılan sayfada kaynak şeridi.
+
+---
+
+## 7. Beşinci Adım — Kaynak Bazlı Minimum Spanning Tree (MST) Ağları
+
+1. **Düz Santral Noktaları ve Halelerin Kaldırılması (`src/lib/visual.ts`, `src/components/TurkeyMap.tsx`):** Haleler ve additive blending kaldırıldı; her santral küçük düz bir nokta olarak (`> 0 MW` için `1,5–4 px` (`√MW`) yarıçap ve `0,9` opaklık; `0 MW` için `1 px` yarıçap ve `0,3` opaklık) en üst katmanda çizildi.
+2. **Kaynak Bazlı MST Ağları (`src/lib/network.ts`):** Her enerji kaynağı için ayrı bir Minimum Spanning Tree (Prim algoritması, Haversine `km` mesafesi, `≤ 150 km` eşiği) `useMemo` ile bir kez hesaplandı. Kenarlar `ArcLayer` ile (3D'de hafif yükselen yaylar, 2D'de düz çizgi; önce fosil ağları, üstte yenilenebilir ağları) çizildi; parlaklık (`0,08–0,90` opaklık) ve kalınlık (`0,5–2,5 px`) iki uçtaki santralin o saatteki MW toplamının kaynak maksimumuna oranına göre `400 ms` yumuşak geçişle güncellendi.
+3. **Kamera (`fitBounds`), Kaynak Filtresi ve Bilgi Notu:** Masaüstünde varsayılan `45°` 3D eğim ve panel padding'li `WebMercatorViewport.fitBounds` uygulandı (mobilde varsayılan 2D); kaynak şeridinde bir dilime/etikete tıklanınca o kaynağın ağı vurgulanıp diğerlerinin `%15` opaklığa inmesi sağlandı ve `"i"` çekmecesine `"Çizgiler aynı kaynaktaki santralleri görsel olarak birleştirir; gerçek iletim hatlarını göstermez."` notu eklendi.

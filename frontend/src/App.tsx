@@ -1,27 +1,68 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
-import { FooterAttribution } from "@/components/FooterAttribution";
-import { HeaderBar } from "@/components/HeaderBar";
-import { LiveCounters } from "@/components/LiveCounters";
+import { InfoDrawer } from "@/components/InfoDrawer";
 import { PlaybackBar } from "@/components/PlaybackBar";
+import { SourceFilterBar } from "@/components/SourceFilterBar";
+import { TopLeftHud } from "@/components/TopLeftHud";
 import { TurkeyMap } from "@/components/TurkeyMap";
+import { DEFAULT_SOURCE_ORDER } from "@/lib/constants";
 import {
   loadDashboardData,
   type DashboardInitialData,
   type DashboardMode,
   type PlaybackSpeed,
 } from "@/lib/data";
+import type { MapFilter } from "@/lib/visual";
+
+const VALID_FILTERS = new Set<string>([
+  "all",
+  "renewable",
+  "fossil",
+  ...DEFAULT_SOURCE_ORDER,
+]);
+
+function readFilterFromUrl(): MapFilter {
+  if (typeof window === "undefined") return "all";
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("kaynak")?.trim();
+  if (raw && VALID_FILTERS.has(raw)) {
+    return raw as MapFilter;
+  }
+  return "all";
+}
 
 export function App() {
   const [data, setData] = useState<DashboardInitialData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Mod ve seçili saat state'leri App seviyesinde tutulur (kaynak grafiği ve il paneli de buradan beslenecek)
+  // Mod, seçili saat, kaynak filtresi ve oynatma state'leri App seviyesinde tutulur
   const [mode, setMode] = useState<DashboardMode>("live");
   const [selectedHourIndex, setSelectedHourIndex] = useState<number>(23);
+  const [activeFilter, setActiveFilter] = useState<MapFilter>(readFilterFromUrl);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
+
+  // Seçili filtreyi URL sorgu parametresine (?kaynak=wind) yansıt
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (activeFilter === "all") {
+      url.searchParams.delete("kaynak");
+    } else {
+      url.searchParams.set("kaynak", activeFilter);
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, [activeFilter]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveFilter(readFilterFromUrl());
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const fetchAll = useCallback((signal?: AbortSignal) => {
     setLoading(true);
@@ -78,8 +119,6 @@ export function App() {
       if (prevPlaying) {
         return false;
       }
-      // Oynatma başlatıldığında otomatik olarak Oynatma moduna geç;
-      // eğer Canlı moddaysak veya son saatteysek (23:00) günü 00:00'dan başlat.
       setMode("playback");
       setSelectedHourIndex((prevHour) => {
         if (mode === "live" || prevHour >= maxHourIndex) {
@@ -91,14 +130,19 @@ export function App() {
     });
   }, [mode, maxHourIndex]);
 
-  // Otomatik oynatma zamanlayıcısı: gün sonunda (23:00'dan sonra) başa (00:00) sarıp durur, döngüye girmez.
+  const handleToggleLoop = useCallback(() => {
+    setIsLooping((prev) => !prev);
+  }, []);
+
   useEffect(() => {
     if (!isPlaying) return;
 
     const timer = window.setTimeout(() => {
       setSelectedHourIndex((prevHour) => {
         if (prevHour >= maxHourIndex) {
-          setIsPlaying(false);
+          if (!isLooping) {
+            setIsPlaying(false);
+          }
           return 0;
         }
         return prevHour + 1;
@@ -106,9 +150,8 @@ export function App() {
     }, stepDurationMs);
 
     return () => window.clearTimeout(timer);
-  }, [isPlaying, selectedHourIndex, maxHourIndex, stepDurationMs]);
+  }, [isPlaying, isLooping, selectedHourIndex, maxHourIndex, stepDurationMs]);
 
-  // Klavye kısayolları: Boşluk = oynat/duraklat, Sol/Sağ ok = 1 saat geri/ileri
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -145,8 +188,6 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleTogglePlay, maxHourIndex, mode]);
 
-  // Canlı modda harita generation_24h'ın son saatinde (23:00) durur, sayaçlar snapshot.live gösterir.
-  // Oynatma modunda hem sayaçlar hem harita seçili saati (selectedHourIndex) gösterir.
   const effectiveMapHourIndex =
     mode === "live" ? (data?.defaultHourIndex ?? 23) : selectedHourIndex;
 
@@ -163,28 +204,16 @@ export function App() {
   const selectedHourTimestamp =
     data?.hours[effectiveMapHourIndex] ?? data?.lastHourTimestamp ?? null;
 
-  // Oynatma sırasında geçiş süresi adım süresine eşittir; elle kaydırırken 320 ms yumuşak geçiş kullanılır
-  const transitionDurationMs = isPlaying ? stepDurationMs : 320;
   const counterAnimationMs = isPlaying
-    ? Math.min(420, Math.round(stepDurationMs * 0.85))
+    ? Math.min(400, Math.round(stepDurationMs * 0.85))
     : 280;
 
   return (
-    <div className="flex min-h-dvh w-full flex-col bg-[#060A12] text-[#F8FAFC]">
-      {/* Üst Kontrol Odası Başlık, Mod Seçici ("Canlı" / "Oynatma (24 saat)") ve Zaman Çubuğu */}
-      <HeaderBar
-        snapshot={data?.snapshot ?? null}
-        mode={mode}
-        onModeChange={handleModeChange}
-        selectedHourTimestamp={selectedHourTimestamp}
-        loading={loading}
-      />
-
-      {/* Hata / Veri Yok Durumu */}
+    <div className="relative h-dvh w-screen overflow-hidden bg-[#03060C] text-[#F8FAFC]">
       {errorMessage ? (
         <div
           role="alert"
-          className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center"
+          className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#F87171]/40 bg-[#450A0A]/80 text-[#F87171]">
             <AlertCircle className="h-6 w-6" aria-hidden="true" />
@@ -196,7 +225,7 @@ export function App() {
           <button
             type="button"
             onClick={() => fetchAll()}
-            className="mt-1 inline-flex min-h-[40px] items-center gap-2 rounded-md border border-[#334155] bg-[#151F32] px-4 py-2 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-[#1E293B]"
+            className="mt-1 inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-white/15"
           >
             <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Tekrar Dene</span>
@@ -204,40 +233,70 @@ export function App() {
         </div>
       ) : (
         <>
-          {/* Sayaçlar: Canlı modda snapshot_latest.live, Oynatma modunda mix_24h.plants_day[saat] */}
-          <LiveCounters
+          {/* 1. Tam Ekran Harita (İl Bazında 3D Katmanlı Bloklar) */}
+          <TurkeyMap
+            provincesGeoJson={data?.provincesGeoJson ?? null}
+            provinceSeriesByPlate={data?.provinceSeriesByPlate ?? null}
+            neighborsGeoJson={data?.neighborsGeoJson ?? null}
+            sourceLabels={data?.sourceLabels ?? null}
+            activeFilter={activeFilter}
+            selectedHourIndex={effectiveMapHourIndex}
+            selectedHourTimestamp={selectedHourTimestamp}
+            isPlaying={isPlaying}
+            loading={loading}
+          />
+
+          {/* 2. Sol Üst: Tek Kompakt Koyu Cam Panel + 11 Dilimli Yatay Kaynak Şeridi */}
+          <TopLeftHud
             counter={activeCounter}
             sourceLabels={data?.sourceLabels ?? null}
+            provinceSeriesByPlate={data?.provinceSeriesByPlate ?? null}
+            selectedHourIndex={effectiveMapHourIndex}
             mode={mode}
+            onModeChange={handleModeChange}
+            activeFilter={activeFilter}
+            onSelectFilter={setActiveFilter}
             animationDurationMs={counterAnimationMs}
             loading={loading}
           />
 
-          {/* Merkez: Türkiye İl Sınırları + Santral Noktaları ve Yumuşak Geçişli 3D Sütunlar */}
-          <TurkeyMap
-            provincesGeoJson={data?.provincesGeoJson ?? null}
-            plants={data?.locatedPlants ?? []}
-            totalPlantsInCatalog={data?.totalPlantsInCatalog ?? 0}
-            snapshot={data?.snapshot ?? null}
+          {/* 3. Üst Orta (Masaüstü) / Alt Çipler (Mobil): Kaynak Filtresi Düğmeleri */}
+          <SourceFilterBar
+            activeFilter={activeFilter}
+            onSelectFilter={setActiveFilter}
             sourceLabels={data?.sourceLabels ?? null}
-            mode={mode}
+            activeCounter={activeCounter}
+            provinceSeriesByPlate={data?.provinceSeriesByPlate ?? null}
+            selectedHourIndex={effectiveMapHourIndex}
+          />
+
+          {/* 4. Sağ Üst: Küçük Tazelik Rozeti + "i" Bilgi Çekmecesi */}
+          <InfoDrawer
+            snapshot={data?.snapshot ?? null}
+            provinces24h={data?.provinces24h ?? null}
             selectedHourIndex={effectiveMapHourIndex}
             selectedHourTimestamp={selectedHourTimestamp}
             selectedHourTotalMw={selectedHourSnapshot?.totalMw ?? null}
-            transitionDurationMs={transitionDurationMs}
-            loading={loading}
+            locatedPlantCount={data?.locatedPlants.length ?? 0}
+            totalPlantsInCatalog={data?.totalPlantsInCatalog ?? 0}
           />
 
-          {/* Alt 24 Saatlik Oynatma Çubuğu */}
-          {data && (
+          {/* 5. Alt: İnce Oynatma Çubuğu (+ Mobilde Alttan Açılan Kaynak Şeridi) */}
+          {data && activeCounter && (
             <PlaybackBar
               mode={mode}
               plantsDayDate={data.snapshot.plants_day.date}
               playbackHours={data.playbackHours}
+              activeCounter={activeCounter}
+              sourceLabels={data.sourceLabels}
+              activeFilter={activeFilter}
+              onSelectFilter={setActiveFilter}
               selectedHourIndex={effectiveMapHourIndex}
               isPlaying={isPlaying}
+              isLooping={isLooping}
               speed={playbackSpeed}
               onTogglePlay={handleTogglePlay}
+              onToggleLoop={handleToggleLoop}
               onSelectHour={handleSelectHour}
               onChangeSpeed={setPlaybackSpeed}
               onReturnToLive={() => handleModeChange("live")}
@@ -245,9 +304,6 @@ export function App() {
           )}
         </>
       )}
-
-      {/* Alt Bilgi ve Zorunlu Atıflar */}
-      <FooterAttribution />
     </div>
   );
 }
