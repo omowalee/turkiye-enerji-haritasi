@@ -3,7 +3,7 @@
 with raw_dedup as (
     select *
     from {{ source('epias_raw', 'realtime_generation_source') }}
-    qualify row_number() over (partition by ts order by ingested_at desc) = 1
+    qualify row_number() over (partition by date_local, ts order by ingested_at desc) = 1  -- date_local: bölüm budaması
 ),
 
 unpivoted as (

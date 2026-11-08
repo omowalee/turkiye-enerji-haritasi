@@ -2,7 +2,8 @@
 with raw_dedup as (
     select *
     from {{ source('epias_raw', 'realtime_generation_plant') }}
-    qualify row_number() over (partition by ts, pp_id order by ingested_at desc) = 1
+    -- date_local pencerede: ts onu belirler (anlam aynı), date_tr filtresi bölüm budamasına iner.
+    qualify row_number() over (partition by date_local, ts, pp_id order by ingested_at desc) = 1
 ),
 
 unpivoted as (

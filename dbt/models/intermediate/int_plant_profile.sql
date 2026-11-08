@@ -1,7 +1,7 @@
 {{ config(materialized='table') }}
 -- Grain: bir satir = bir EPIAS santrali (plant_id), stg_epias__power_plants'taki her santral.
 -- Pencere: santral verisinde 24 saati tam olan en son 30 gun (date_tr, Istanbul gunu).
--- Not: stg_epias__generation_by_plant view'i date_tr filtresine ragmen ~0,7 GB tarar (dedup penceresi bolum budamayi engelliyor).
+-- Not: date_tr filtresi stg view'inde bolum budamasina iner (dedup penceresinde date_local var).
 with recent as (
     select hour_start_at_utc, date_tr, plant_id, source_type, generation_mw
     from {{ ref('stg_epias__generation_by_plant') }}

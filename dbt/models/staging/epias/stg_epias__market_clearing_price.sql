@@ -6,4 +6,4 @@ select
     priceUsd as price_usd_per_mwh,
     priceEur as price_eur_per_mwh
 from {{ source('epias_raw', 'market_clearing_price') }}
-qualify row_number() over (partition by ts order by ingested_at desc) = 1
+qualify row_number() over (partition by date_local, ts order by ingested_at desc) = 1  -- date_local: bölüm budaması
