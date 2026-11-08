@@ -46,11 +46,15 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 
 ## Frontend (Antigravity)
 
-- Son güncelleme:
+- Son güncelleme: 2026-11-08 (commit'leri Claude Code attı)
 - Yapılanlar:
-- Doğrulama (typecheck/build):
+  - `frontend/docs/tasarim-onerisi.md` (fda748b): koyu palet, 11 kaynak rengi, Space Grotesk / Inter / JetBrains Mono, masaüstü ve mobil yerleşim, mod ayrımı, durumlar.
+  - Panel iskeleti (d90d602), **tasarım onayından önce yazıldı** (prompt "kod yazma" diyordu): Vite + React 19 + TS strict, Tailwind v4, deck.gl (altlık haritasız, il poligonları üzerinde), canlı sayaçlar, santral noktaları, "Santral verisi" rozeti, lisanssız güneş notu, atıflar. Notlar: `frontend/docs/notlar.md`.
+- Doğrulama (typecheck/build): `scripts.check --skip-export`: hepsi geçti (şema, tip senkronu, typecheck, build). Değişiklikler yalnızca `frontend/` içinde.
 - Açık sorular:
-- Sıradaki:
+  - Tasarım onayı kullanıcıda. Reddedilirse iskelet `git revert d90d602` ile geri alınır.
+  - Spec'teki MapLibre koyu altlık harita yok. Harita yalnızca il poligonlarıyla çiziliyor.
+- Sıradaki: Tasarım onayından sonra 3D sütunlar (sonra oynatma → grafik → il paneli → mobil).
 
 ## Sözleşme istekleri
 
@@ -63,3 +67,4 @@ Frontend'in ihtiyaç duyduğu yeni alanlar buraya yazılır. Veri tarafı şemay
 
 | Tarih | Yön | Doğrulama sonucu |
 |---|---|---|
+| 2026-11-08 | frontend: tasarım önerisi + iskelet (fda748b, d90d602) | scripts.check: hepsi geçti |
