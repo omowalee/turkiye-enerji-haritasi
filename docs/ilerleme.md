@@ -60,6 +60,13 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Doğrulama: tam `dbt build` PASS=180 WARN=2 (bilinen) ERROR=0. `scripts.check`: 1-3 geçti, 4 (frontend typecheck) Antigravity'nin üzerinde çalıştığı `TurkeyMap.tsx` içindeki kullanılmayan değişkenler (TS6133) yüzünden düştü; veri tarafıyla ilgisiz.
 - Sıradaki: Aşama 5 (Airflow: ingest → dbt build → export). Açık: frontend typecheck hatası Antigravity'de.
 
+- Tüketim ve sözleşme 0.2 (2026-11-08):
+  - Ham katman: `realtime_consumption` (rt-cons), 90 gün, eksik saat yok (0b9e16e). Tüketim, üretimden ~1 sa sonra yayımlanıyor. Tazelik: 5 sa uyarı / 7 sa hata.
+  - dbt: `stg_epias__consumption`, `agg_country_balance_hourly`, `mart_live_snapshot` alanları (eea2872…04cc6a6). insert_overwrite + sıfıra çekilen saat testi (e923182). BATMAN TÜPRAŞ vekil kayıt (8dd92f7).
+  - Sözleşme 0.2 (55ebab4), yalnızca ekleme: `consumption_mw`, `net_import_mw` (+ = ithalat), `balance_mw` (lisanslı üretim − tüketim). Gece tutarlılığı: 07.11 23:00 farkı 64 MW. Gündüz −9 GW denge = lisanssız güneş.
+  - Doğrulama: `scripts.check --skip-export` hepsi geçti (frontend build dahil).
+  - Açık kararlar (kullanıcı): il dilimleri yakıt kolonu bölmesiyle mi kalsın; konumsuz test 30 günlük pencerede mi kalsın; Aşama 5 planı (Airflow + yayınlama) onayı; il tüketimi için EPDK 2025 raporu (`docs/il-tuketim-kaynaklari.md`) onayı.
+
 ## Frontend (Antigravity)
 
 - Son güncelleme: 2026-11-08 (commit'leri Claude Code attı)
