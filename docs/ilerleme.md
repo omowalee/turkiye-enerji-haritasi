@@ -6,12 +6,12 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 
 - Sürüm: 1
 - Tamamlanan: Aşama 0 (keşif), Aşama 1 (veri çekme, 90 gün geçmiş), sözleşme v0
-- Devam eden: Aşama 2 (dbt; staging ve eşleştirme bitti, sırada marts) — Claude Code · Frontend: tasarım önerisi prompt'u kullanıcıda (Antigravity)
+- Devam eden: Aşama 2 ve 3 veri tarafı bitti (dbt marts, dışa aktarma mart'lardan); sırada Aşama 5 otomasyon — Claude Code · Frontend: tasarım önerisi prompt'u kullanıcıda (Antigravity)
 - Alınmış kararlar: `AGENTS.md` → "Alınmış ürün kararları"
 
 ## Veri tarafı (Claude Code)
 
-- Son güncelleme: 2026-11-08 (Aşama 2 bölüm 2: eşleştirme bitti)
+- Son güncelleme: 2026-11-08 (Aşama 2 bölüm 3: marts; Aşama 3: dışa aktarma mart'lardan)
 - Yapılanlar:
   - `pipeline/epias`: 5 EPİAŞ servisi. `pipeline/bq` ve `jobs`: `epias_raw` tablolarına `date_local` bölümlü idempotent yükleme.
   - `geo_raw`: GEM 4.131, OSM 1.796, il sınırları 81 satır.
@@ -48,11 +48,17 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Doğrulama: PASS=42, WARN=2 (kapasite tutarsızlığı 10, paylaşılan konum 5; hepsi bilinçli düzeltme), ERROR=0. Claude Code tekrar çalıştırdı: aynı.
   - Yenileme: `python -m scripts.match_plants` → `./scripts/dbt.sh build --select plant_match_candidates+` (henüz Airflow'a bağlı değil).
 - Açık kararlar (kullanıcı):
-  - `max_unmatched_generation_share` 0,15'te mi kalsın, 0,10'a mı insin? Gerçek değer 0,0826.
-  - `installed_capacity_mw` konum kaydından geliyor. Paylaşılan konumda tesis toplamını, vekil kayıtta alakasız değeri gösteriyor (ZETES 2.790 MW, TÜPRAŞ İZMİT 5,7 MW). Mart'ta nasıl gösterilecek?
+  - ~~`max_unmatched_generation_share`~~ → karar: %10 uyarı, %15 hata (iki değişken, tek test). Gerçek değer 0,0826.
+  - ~~Kurulu güç paylaşılan/vekil kayıtta~~ → karar: yalnızca kaydı tek santral kullanıyorsa ve vekil değilse; aksi halde NULL (`dim_plants`). Vekil bayrağı seed kolonu `is_location_proxy`.
   - Emin olunmayan düzeltmeler gözle kontrol edilmeli (raporun 5. bölümü: TÜPRAŞ vekil kayıtları, ERDEMİR, AFYON1, EFE JES'ler, MAREN/MEHMETHAN, ADA DGKÇS, MERSİN RES, İSTAÇ BES).
-- Teknik borç: `stg_epias__generation_by_plant` tekilleştirme penceresi `date_local` içermediği için bölüm budaması çalışmıyor. `int_plant_profile` her build'de ~664 MiB tarıyor. Düzeltme: pencereye `date_local` eklemek.
-- Sıradaki: Aşama 2 bölüm 3: `int_generation_enriched` → marts (`fct_generation_hourly`, `agg_*`, `mart_live_snapshot` + kesinleşmiş saat testi). Önce staging tarama düzeltmesi.
+- ~~Teknik borç: tekilleştirme penceresi bölüm budamasını engelliyor~~ → düzeltildi (631b7d0): 7 gün 664 → 52 MiB, `int_plant_profile` 664 → 296 MiB.
+- Aşama 2 bölüm 3 + Aşama 3 (631b7d0…0501c7a, Opus):
+  - `int_generation_enriched` (view). Mart'lar (`epias_marts`): `dim_plants` (1.835), `fct_generation_hourly` (artımlı merge, 2,4 M satır, gün bölümü), `agg_generation_by_source_hourly` (21,7 bin, `is_finalized`), `agg_generation_by_province_hourly` (artımlı, 478 bin; konumsuz = `plate_code` NULL / `province_key` 0), `mart_live_snapshot` (tek satır).
+  - Artımlı çalışma: son `lookback_hours` (48) saat, fct 25,9 MiB, il 22,9 MiB. Eşleştirme değişince `agg_generation_by_province_hourly` için `--full-refresh` gerekir (test yakalar).
+  - Testler: kesinleşmiş saat (`assert_live_hour_is_one_before_latest`), tek satır, paylar %100, mart düzeyinde santral = ülke, il toplamı = santral toplamı, il tablosu güncel eşleştirmeyle tutarlı.
+  - Dışa aktarma artık mart'lardan (~6,7 MiB tarama, `data/raw` bağımlılığı yok). Sözleşme şekli aynı, sürüm 0.1. Örnekler: santral gününde konumlu üretim %82,4 → %89,3; `capacity_mw` dolu 736 → 633.
+  - Doğrulama: tam `dbt build` PASS=180 WARN=2 (bilinen) ERROR=0. `scripts.check`: 1-3 geçti, 4 (frontend typecheck) Antigravity'nin üzerinde çalıştığı `TurkeyMap.tsx` içindeki kullanılmayan değişkenler (TS6133) yüzünden düştü; veri tarafıyla ilgisiz.
+- Sıradaki: Aşama 5 (Airflow: ingest → dbt build → export). Açık: frontend typecheck hatası Antigravity'de.
 
 ## Frontend (Antigravity)
 
