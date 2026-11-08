@@ -6,12 +6,12 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 
 - Sürüm: 1
 - Tamamlanan: Aşama 0 (keşif), Aşama 1 (veri çekme, 90 gün geçmiş), sözleşme v0
-- Devam eden: Aşama 2 (dbt) — Claude Code · Aşama 4 iskeleti (örnek veriyle) — Antigravity
+- Devam eden: Aşama 2 (dbt) — Claude Code · Frontend: agy CLI kurulumu bekleniyor (worktree `../a-frontend` hazır)
 - Alınmış kararlar: `AGENTS.md` → "Alınmış ürün kararları"
 
 ## Veri tarafı (Claude Code)
 
-- Son güncelleme: 2026-11-08 (sözleşme v0 bitti)
+- Son güncelleme: 2026-11-08 (sözleşme v0 revize edildi, Aşama 2 başladı)
 - Yapılanlar:
   - `pipeline/epias`: 5 EPİAŞ servisi. `pipeline/bq` ve `jobs`: `epias_raw` tablolarına `date_local` bölümlü idempotent yükleme.
   - `geo_raw`: GEM 4.131, OSM 1.796, il sınırları 81 satır.
@@ -25,15 +25,18 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 - Sözleşme v0 (2026-11-08):
   - `contracts/`: 6 dosya şeması + `common.schema.json` (JSON Schema 2020-12, `schema_version` 0.1.0). Açıklama: `docs/data-contract.md`.
   - `frontend/src/types/`: şemalardan üretildi (`cd contracts && npm run gen:types`, json-schema-to-typescript 15.0.4).
-  - `frontend/public/data/sample/`: gerçek veriden (live 08.11 11:00, santral günü 07.11), `python -m scripts.export_sample` ile. Toplam 501 KB (gzip 102 KB).
-  - Doğrulama: 6/6 dosya şemaya uyuyor (`--validate-only`), `tsc --noEmit --strict` geçti.
+  - `frontend/public/data/sample/`: gerçek veriden (live 08.11 10:00 kesinleşmiş saat, santral günü 07.11), `python -m scripts.export_sample` ile. Toplam 500 KB (gzip 102 KB).
+  - Revizyon (8b0fbe1): İngilizce kaynak anahtarları + `contracts/source_labels.json` (Türkçe etiketler), `schema_version: "0.1"`, kesinleşmiş saat kuralı + `live.provisional`.
+  - Tek doğrulama komutu: `.venv/Scripts/python -X utf8 -m scripts.check` (dışa aktar → şema → tip senkronu → frontend typecheck/build). Son sonuç: hepsi geçti (frontend yok, atlandı).
+  - Worktree: `../a-frontend` (`frontend` branch, 8b0fbe1'den).
 - Açık sorular:
-  - **Son saat eksik geliyor:** EPİAŞ kaynak bazlı verinin son saatini önce eksik yayımlıyor (08.11 11:00: 12.909 → 19.920 MW). `mart_live_snapshot` için "kesinleşmiş son saat" kuralı gerekli (ör. `ingested_at ≥ saat sonu + X dk`, değilse bir önceki saat). Aşama 2'de karar.
+  - ~~Son saat eksik geliyor~~ → **karar verildi (2026-11-08):** `live.ts` = ülke verisindeki en son saatten bir önceki saat; en son saat `live.provisional` alanında. Aşama 2'de dbt kuralı + test.
+  - **agy CLI kurulu değil** → frontend otomatik akışı bekliyor. Kurulum: `irm https://antigravity.google/cli/install.ps1 | iex` (kaynağı doğrulanmalı).
   - v0 eşleştirmesi geçici: %82,4 konumlu üretim, yanlış pozitif örneği "KARAKAYA HES TRABZON" → Diyarbakır.
   - Örnek export yerel `data/raw/` (git dışı) dosyalarına bağlı. dbt sonrası export mart'lardan okuyacak.
   - eptr2 hata türlerini ayırmıyor, tekrar deneme kararı mesaj metnine bakıyor (kırılgan).
   - Ham kolonlar NULL olabiliyor, `not_null` kontrolü dbt testlerinde yapılacak.
-- Sıradaki: Kullanıcı frontend worktree'sini kurup Antigravity'yi başlatacak. Sonra "Aşama 2'ye geç" komutuyla dbt.
+- Sıradaki: Aşama 2 (dbt): kurulum + staging → eşleştirme (en büyük 200 + override seed) → intermediate → marts.
 
 ## Frontend (Antigravity)
 
