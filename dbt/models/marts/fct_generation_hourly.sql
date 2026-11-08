@@ -1,12 +1,12 @@
 {{ config(
     materialized='incremental',
-    incremental_strategy='merge',
-    unique_key=['hour_start_at_utc', 'plant_id'],
+    incremental_strategy='insert_overwrite',
     partition_by={'field': 'hour_start_at_utc', 'data_type': 'timestamp', 'granularity': 'day'},
     cluster_by=['plant_id', 'source_type']
 ) }}
 -- Grain: bir satir = bir saat x bir santral (plant_id). Lisansli uretim, tum yakitlarin toplami.
--- Artimli: her calismada son var('lookback_hours') saat yeniden islenir (EPIAS yakin saatleri revize eder).
+-- Artimli (insert_overwrite): son var('lookback_hours') saati iceren UTC gunleri bastan yazilir; EPIAS revizyonu
+-- ve sifira cekilen (stagingde atilan) santral-saatler boylece kaybolur.
 with enriched as (
     select hour_start_at_utc, date_tr, plant_id, source_type, generation_mw
     from {{ ref('int_generation_enriched') }}

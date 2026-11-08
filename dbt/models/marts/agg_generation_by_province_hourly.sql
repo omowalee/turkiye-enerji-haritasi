@@ -1,14 +1,13 @@
 {{ config(
     materialized='incremental',
-    incremental_strategy='merge',
-    unique_key=['hour_start_at_utc', 'province_key', 'source_type'],
+    incremental_strategy='insert_overwrite',
     partition_by={'field': 'hour_start_at_utc', 'data_type': 'timestamp', 'granularity': 'day'},
     cluster_by=['province_key', 'source_type']
 ) }}
 -- Grain: bir satir = bir saat x bir il x bir source_type (santral verisi, lisansli).
 -- Konumu/ili bilinmeyen santraller plate_code NULL, is_unlocated = true satirinda toplanir; boylece saat
--- toplami santral toplamina esittir. province_key = plate_code, konumsuzda 0 (MERGE anahtari NULL olamaz).
--- Artimli: son var('lookback_hours') saat yeniden islenir. Eslestirme degisince (seed'ler, int_plants_matched)
+-- toplami santral toplamina esittir. province_key = plate_code, konumsuzda 0 (NULL olmayan anahtar; kume ve testler).
+-- Artimli (insert_overwrite): son var('lookback_hours') saati iceren UTC gunleri bastan yazilir. Eslestirme degisince (seed'ler, int_plants_matched)
 -- eski saatlerin ili bayatlar: --full-refresh gerekir (assert_province_agg_matches_current_matching yakalar).
 with enriched as (
     select hour_start_at_utc, date_tr, plate_code, source_type, generation_mw

@@ -82,8 +82,10 @@ models:
   - name: fct_generation_hourly
     description: >
       Grain: bir satır = bir saat x bir santral (plant_id). Lisanslı üretim (rt-gen-bulk), santralin bütün
-      yakıtlarının toplamı; sıfır üretimli santral-saatler yoktur. Artımlı (merge), her çalışmada son
-      var('lookback_hours') saat yeniden işlenir. Bölüm: hour_start_at_utc (gün, UTC); yerel güne göre
+      yakıtlarının toplamı; sıfır üretimli santral-saatler yoktur. Artımlı (insert_overwrite): her çalışmada
+      son var('lookback_hours') saati içeren UTC günlerinin bölümleri baştan yazılır. Böylece EPİAŞ'ın
+      sonradan sıfıra çektiği (staging'de atılan) santral-saatler de silinir; merge bunları bırakırdı.
+      assert_fct_rows_exist_in_staging son 7 günde bayat satır olmadığını denetler. Bölüm: hour_start_at_utc (gün, UTC); yerel güne göre
       okurken bölüm budaması için hour_start_at_utc aralığı da verilmeli. Kaynak bazlı ayrım ve il için
       agg_generation_by_province_hourly; santral nitelikleri için dim_plants.
     columns:
@@ -177,7 +179,8 @@ models:
       Grain: bir satır = bir saat x bir il (province_key) x bir source_type. Santral verisi (rt-gen-bulk),
       lisanslı. Konumu ya da ili bilinmeyen santrallerin üretimi atılmaz: plate_code NULL,
       is_unlocated = true, province_key = 0 satırında toplanır; saat toplamı fct_generation_hourly ile aynıdır.
-      Artımlı (merge), son var('lookback_hours') saat yeniden işlenir. Eşleştirme değişince
+      Artımlı (insert_overwrite): son var('lookback_hours') saati içeren UTC günlerinin bölümleri baştan
+      yazılır (sıfıra çekilen saatler de kaybolur). Eşleştirme değişince
       (plant_match_overrides, plant_match_candidates) `--full-refresh` gerekir; unutulursa
       assert_province_agg_matches_current_matching testi son 7 günde yakalar.
     columns:
@@ -191,7 +194,7 @@ models:
         description: İstanbul yerel günü.
         data_tests: [not_null]
       - name: province_key
-        description: MERGE anahtarı = plate_code; konumsuz satırda 0. Analizde plate_code / is_unlocated kullanın.
+        description: NULL olmayan il anahtarı = plate_code; konumsuz satırda 0 (küme kolonu, tekillik testi). Analizde plate_code / is_unlocated kullanın.
         data_tests: [not_null]
       - name: plate_code
         description: İl plaka kodu (1-81). Konumsuz satırda NULL.
