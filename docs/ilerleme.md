@@ -71,9 +71,9 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Docker: `docker/docker-compose.yml` (proje adı `enerji`), Airflow 3.1.8 LocalExecutor + Postgres 16, arayüz http://localhost:8081. Proje paketleri ayrı venv'de (`/opt/project-venv`). Sırlar: `.env` (env_file) ve `secrets/` (salt okunur). Boşta ~0,9 GB, dbt çalışırken ~1,5 GB.
   - DAG'lar: `enerji_saatlik` (:50; ülke verisi → dbt `country` seçicisi → santral günü kontrolü → export → doğrulama → yayın), `enerji_gunluk` (06:50; santral listesi, lisanssız veri, eşleştirme, tam test). catchup kapalı, `max_active_runs=1`, boşluk doldurma 3–7 gün, dbt lookback 48–168 saat.
   - `scripts/publish.py`: gzip, Cache-Control, `snapshot_latest` en son. Bucket ya da anahtar yoksa yayın atlanır. GitHub Pages iş akışı: `.github/workflows/pages.yml`. README "Nasıl çalıştırılır" bölümü yazıldı.
-  - Doğrulama: pytest 35/35. Container içinde `ingest_country`, `dbt_country` (PASS=57), `export`, `validate` geçti; `publish` bucket olmadığı için atlandı. `dbt_plant` henüz denenmedi (eksik santral günü yok). gitleaks: tüm geçmişte bulgu yok.
+  - Doğrulama: pytest 35/35. Container içinde `ingest_country`, `dbt_country` (PASS=57), `export`, `validate` geçti; `dbt_plant` (PASS=78) geçti. `publish` gerçek yüklemeyle denendi (2026-11-08): 7 dosya kovada, herkese açık 200, gzip, Cache-Control 300/3600 doğru; CORS henüz ayarlı değil. gitleaks: tüm geçmişte bulgu yok.
   - Durum: stack çalışıyor, DAG'lar duraklatılmış.
-  - Bekleyenler (kullanıcı): GCS bucket ve `secrets/publisher.json`; `.env` içine `GCS_BUCKET`; `docker/cors.json` içinde GitHub kullanıcı adı; GitHub repo değişkeni `DATA_BASE_URL`; Antigravity için Vite `base` ve `VITE_DATA_BASE_URL`; DAG'ların açılması; `docker/airflow-entrypoint.sh` (kullanılmıyor) silinmesi.
+  - Bekleyenler (kullanıcı): kovaya CORS uygulanması (`docker/cors.json` içinde GitHub kullanıcı adı); GitHub repo değişkeni `DATA_BASE_URL`; Antigravity için Vite `base` ve `VITE_DATA_BASE_URL`; DAG'ların açılması; `docker/airflow-entrypoint.sh` (kullanılmıyor) silinmesi.
 
 ## Frontend (Antigravity)
 
