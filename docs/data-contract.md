@@ -213,7 +213,7 @@ Sayılar 2026-11-08 örneğinden (santral günü 2026-11-07). Eşleştirme ayrı
    - Son 30 tam günün üretiminde konumlu pay %91,74. 2026-11-07 gününde %89,3, kalan %10,7 `unlocated` olarak görünür.
    - dbt testi: konumsuz pay %10'u aşarsa uyarı, %15'i aşarsa hata.
 2. **Yanlış pozitifler azaltıldı.** v0'daki "KARAKAYA HES TRABZON" → Diyarbakır gibi eşleşmeler elle düzeltme seed'iyle kaldırıldı. Kalan şüpheli eşleşmeler dbt uyarı testlerinde listelenir.
-3. **Kurulu güç kısmi.** Konumlu 758 santralin 633'ünde `capacity_mw` dolu. 125'inde `null`: paylaşılan sahalar, vekil kayıtlar ve kaydında güç olmayanlar (bkz. "Kurulu güç kuralı").
+3. **Kurulu güç kısmi.** Konumlu 758 santralin 632'sinde `capacity_mw` dolu. 126'sında `null`: paylaşılan sahalar, vekil kayıtlar (TÜPRAŞ İZMİT, İZMİR, BATMAN) ve kaydında güç olmayanlar (bkz. "Kurulu güç kuralı").
 4. **Son saat eksik geliyordu: karar verildi.** Bkz. "Kesinleşmiş saat kuralı". `live` bir önceki saati kullanır, eksik saat `live.provisional` alanına gider.
 5. **Gelecekte değişebilecek alanlar:**
    - santral için `province` adı (şimdilik yalnızca plaka kodu var)
