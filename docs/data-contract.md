@@ -64,6 +64,16 @@ Sitenin okuduğu JSON dosyalarının şekli `contracts/*.schema.json` (JSON Sche
 - Panel, eksik bir anahtarı 0 kabul etmeli ve hata vermemelidir.
 - Renkler AGENTS.md'de tanımlıdır. Hidro baraj ve akarsu aynı renk ailesindendir.
 
+### Kaynak türü kuralı (karar: 2026-11-08)
+
+Bir santral birden çok yakıtla üretebilir (ör. doğalgaz + fueloil). Kaynak türü üç yerde, üç ayrı anlamda kullanılır:
+
+- **Santral rengi ve santral filtresi** (`plants.json` `source`): santralin son 30 tam gündeki baskın yakıtı (`dim_plants.source_type`). Gün içinde değişmez.
+- **Kaynak dağılımları** (`mix_24h`, `snapshot_latest.live.by_source`, `provinces_24h` `mwh_by_source`): her MWh, EPİAŞ'ın raporladığı yakıt kolonuna yazılır. Çok yakıtlı santralin üretimi kaynaklara bölünür. Bu sayede il dağılımlarının toplamı, ülke verisinin kaynak toplamlarıyla tutar.
+- **Saatlik santral filtresi** (dbt `fct_generation_hourly.source_type`): santralin o saatteki baskın yakıtı. Şimdilik hiçbir JSON'a girmez.
+
+Fark küçüktür: 2026-11-07'de üretimin %0,41'i (3.589 MWh, 119 santral) saatlik baskın yakıttan farklı bir kolondan geldi. Bu yüzden bir santralin rengi, bulunduğu ilin kaynak dağılımındaki dilimle her zaman birebir örtüşmeyebilir.
+
 ## İki mod ve iki zaman damgası
 
 AGENTS.md'deki karar gereği, ülke verisi ile santral verisi farklı gecikmelerle gelir. Bu yüzden ayrı bloklarda ve kendi zaman damgalarıyla taşınır:
@@ -125,7 +135,7 @@ Santral boyutu, günde bir güncellenir. `plants[]` dizisindeki her eleman:
 |---|---|---|
 | `id` | int | EPİAŞ santral id'si (`generation_24h.plant_ids` ile eşleşir) |
 | `name` | string | EPİAŞ adı (EİÇ eki kırpılmış) |
-| `source` | SourceType | Son 30 günün baskın yakıtı |
+| `source` | SourceType | Son 30 tam günün baskın yakıtı. Santral rengi buradan gelir (bkz. "Kaynak türü kuralı") |
 | `lat`, `lon` | number \| null | 4 ondalık. Eşleşmeyen santralde `null` olur |
 | `province` | int \| null | İl plaka kodu (1–81). Koordinattan nokta-poligon yöntemiyle bulunur |
 | `capacity_mw` | number \| null | Kurulu güç, konum kaydından (GEM, yoksa OSM). Kayıt paylaşılıyorsa, vekil kayıtsa ya da güç bilinmiyorsa `null` (aşağıya bakın) |
@@ -178,7 +188,7 @@ Kaynak dağılımı grafiği ve oynatma modundaki sayaçlar için.
 | `provinces[].plate` | Plaka kodu (`provinces.geojson` içindeki `plate` ile eşleşir) |
 | `provinces[].name` | İl adı |
 | `provinces[].mw` | 24 saatlik toplam (int) |
-| `provinces[].mwh_by_source` | Günlük kaynak dağılımı (PerSource, int) |
+| `provinces[].mwh_by_source` | Günlük kaynak dağılımı (PerSource, int). Her MWh EPİAŞ'ın yakıt kolonuna yazılır, santralin baskın yakıtına değil (bkz. "Kaynak türü kuralı") |
 | `provinces[].total_mwh` | Günlük toplam |
 | `provinces[].rank` | Türkiye içindeki sıra (1 = en çok üreten) |
 | `provinces[].share_pct` | Ülke toplamı içindeki pay (konumsuz üretim dahil paydada) |
