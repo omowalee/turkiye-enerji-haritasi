@@ -6,12 +6,12 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 
 - Sürüm: 1
 - Tamamlanan: Aşama 0 (keşif), Aşama 1 (veri çekme, 90 gün geçmiş), sözleşme v0
-- Devam eden: Aşama 2 (dbt; staging bitti, sırada eşleştirme) — Claude Code · Frontend: tasarım önerisi prompt'u kullanıcıda (Antigravity)
+- Devam eden: Aşama 2 (dbt; staging ve eşleştirme bitti, sırada marts) — Claude Code · Frontend: tasarım önerisi prompt'u kullanıcıda (Antigravity)
 - Alınmış kararlar: `AGENTS.md` → "Alınmış ürün kararları"
 
 ## Veri tarafı (Claude Code)
 
-- Son güncelleme: 2026-11-08 (Aşama 2 bölüm 1: dbt kurulumu + staging bitti)
+- Son güncelleme: 2026-11-08 (Aşama 2 bölüm 2: eşleştirme bitti)
 - Yapılanlar:
   - `pipeline/epias`: 5 EPİAŞ servisi. `pipeline/bq` ve `jobs`: `epias_raw` tablolarına `date_local` bölümlü idempotent yükleme.
   - `geo_raw`: GEM 4.131, OSM 1.796, il sınırları 81 satır.
@@ -42,7 +42,17 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Örnek export yerel `data/raw/` (git dışı) dosyalarına bağlı. dbt sonrası export mart'lardan okuyacak.
   - eptr2 hata türlerini ayırmıyor, tekrar deneme kararı mesaj metnine bakıyor (kırılgan).
   - Ham kolonlar NULL olabiliyor, `not_null` kontrolü dbt testlerinde yapılacak.
-- Sıradaki: Aşama 2 bölüm 2 — `int_plants_matched` (Opus, Claude limiti yenilenince): en büyük 200 santral + `seeds/plant_match_overrides.csv`. Sonra intermediate → marts → kesinleşmiş saat testi.
+- Aşama 2 bölüm 2: eşleştirme (8116205…cd05922, Opus). Rapor: `docs/eslestirme-raporu.md`.
+  - `int_plant_profile` (santral, son 30 gün), `scripts/match_plants.py` → üretilmiş seed `plant_match_candidates.csv`, elle düzeltme seed'i `plant_match_overrides.csv` (46 satır: 34 match, 12 no_match), `int_plants_matched` (santral başına konum, il, `match_method`, `match_confidence`).
+  - Konumlu üretim: %85,98 → **%91,74** (ilk 200: %98,44). Konumsuz pay %8,26. KARAKAYA HES TRABZON ve PİRİNÇLİ HES `no_match` oldu. BANDIRMA3 ve AFYON1 doğru kayda bağlandı.
+  - Doğrulama: PASS=42, WARN=2 (kapasite tutarsızlığı 10, paylaşılan konum 5; hepsi bilinçli düzeltme), ERROR=0. Claude Code tekrar çalıştırdı: aynı.
+  - Yenileme: `python -m scripts.match_plants` → `./scripts/dbt.sh build --select plant_match_candidates+` (henüz Airflow'a bağlı değil).
+- Açık kararlar (kullanıcı):
+  - `max_unmatched_generation_share` 0,15'te mi kalsın, 0,10'a mı insin? Gerçek değer 0,0826.
+  - `installed_capacity_mw` konum kaydından geliyor. Paylaşılan konumda tesis toplamını, vekil kayıtta alakasız değeri gösteriyor (ZETES 2.790 MW, TÜPRAŞ İZMİT 5,7 MW). Mart'ta nasıl gösterilecek?
+  - Emin olunmayan düzeltmeler gözle kontrol edilmeli (raporun 5. bölümü: TÜPRAŞ vekil kayıtları, ERDEMİR, AFYON1, EFE JES'ler, MAREN/MEHMETHAN, ADA DGKÇS, MERSİN RES, İSTAÇ BES).
+- Teknik borç: `stg_epias__generation_by_plant` tekilleştirme penceresi `date_local` içermediği için bölüm budaması çalışmıyor. `int_plant_profile` her build'de ~664 MiB tarıyor. Düzeltme: pencereye `date_local` eklemek.
+- Sıradaki: Aşama 2 bölüm 3: `int_generation_enriched` → marts (`fct_generation_hourly`, `agg_*`, `mart_live_snapshot` + kesinleşmiş saat testi). Önce staging tarama düzeltmesi.
 
 ## Frontend (Antigravity)
 
