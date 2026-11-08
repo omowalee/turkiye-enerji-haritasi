@@ -6,7 +6,7 @@ normalize ad tam aynı, ünite numarası uyumlu, il ipucu uyumlu, kapasite max s
 dbt/seeds/plant_match_candidates.csv dosyasına yazılır (üretilmiş dosya, elle düzenlenmez).
 Eşik bu betikte uygulanmaz: dbt (int_plants_matched, var match_min_score) uygular.
 
-Puan (0-100) = rapidfuzz token_set_ratio (normalize adlar) + düzeltmeler:
+Puan (0-100) = max(token_set_ratio, boşluksuz ratio) (normalize adlar; KAVSAKBENDI ↔ KAVSAK BENDI) + düzeltmeler:
   - ortak kelimeler yalnızca il adı / numara / tek harf ise ve iki tarafta başka ayırt edici kelime varsa: en çok 70
   - ünite numaraları çelişiyorsa (ZETES 2 ↔ ZETES 3): numarasız ad puanı - 5
   - EPİAŞ adında il adı geçiyor ve aday o ilin 25 km dışındaysa: -30
@@ -55,7 +55,7 @@ STOP = {
     # Türkçe tür / genel kelimeler
     "HES", "RES", "GES", "JES", "BES", "TES", "DGKC", "DGKCS", "DGK", "KCS", "ENH", "TERMIK", "SANTRAL",
     "SANTRALI", "SANTRALLERI", "HIDROELEKTRIK", "HIDRO", "BARAJ", "BARAJI", "VE", "REGULATORU", "REG", "KOMBINE",
-    "CEVRIM", "DOGALGAZ", "DOGAL", "GAZ", "GAZI", "RUZGAR", "GUNES", "JEOTERMAL", "ELEKTRIK", "URETIM", "ENERJI",
+    "CEVRIM", "DOGALGAZ", "DOGAL", "GAZ", "RUZGAR", "GUNES", "JEOTERMAL", "ELEKTRIK", "URETIM", "ENERJI",
     "ENERJISI", "KOJEN", "KOJENERASYON", "BIYOKUTLE", "BIYOGAZ", "COP", "SANAYI", "TIC", "LTD", "STI", "AS",
     "SAN", "ISLETME", "TESISI", "FOIL", "OIL", "F", "ATIK", "ISI", "KOMUR", "ITHAL",
     # İngilizce (GEM)
@@ -132,16 +132,18 @@ def build_candidates(loc: pd.DataFrame) -> pd.DataFrame:
                 variants.extend(v for v in re.split(r"[,;]", nm) if v.strip())
         for v in dict.fromkeys(variants):
             toks = tokens(v)
-            if toks:
+            # yalnız numara / tek harften oluşan varyant ("Phases 1, 3" bölününce kalan "3") her ada alt küme olur
+            if any(not is_unit(t) for t in toks):
                 rows.append({"location_source": r.location_source, "location_id": r.location_id,
                              "family": r.plant_family, "capacity_mw": r.capacity_mw,
-                             "pt": pt, "toks": toks, "full": " ".join(toks), "core": " ".join(core(toks))})
+                             "pt": pt, "toks": toks, "full": " ".join(toks), "core": " ".join(core(toks)),
+                             "glued": "".join(toks)})
     return pd.DataFrame(rows)
 
 
 def score_pair(p: dict, c: dict, generic: set, prov_km: dict) -> tuple:
     ptoks, ctoks = p["toks"], c["toks"]
-    s = fuzz.token_set_ratio(p["full"], c["full"])
+    s = max(fuzz.token_set_ratio(p["full"], c["full"]), fuzz.ratio(p["glued"], c["glued"]))
     pnum = {t for t in ptoks if t.isdigit()}
     cnum = {t for t in ctoks if t.isdigit()}
     conflict = bool(pnum and cnum and not pnum & cnum)
@@ -179,6 +181,7 @@ def best_for(p: dict, pool: pd.DataFrame, generic: set, prov_km: dict):
     idx = {m[2] for m in process.extract(p["full"], pool["full"].tolist(), scorer=fuzz.token_set_ratio, limit=TOP_K)}
     if p["core"]:
         idx |= {m[2] for m in process.extract(p["core"], pool["core"].tolist(), scorer=fuzz.token_set_ratio, limit=TOP_K)}
+    idx |= {m[2] for m in process.extract(p["glued"], pool["glued"].tolist(), scorer=fuzz.ratio, limit=TOP_K)}
     best = None
     for i in idx:
         c = pool.iloc[i]
@@ -225,7 +228,7 @@ def main() -> None:
     results = {}
     for r in prof.itertuples():
         toks = tokens(r.plant_name)
-        p = {"toks": toks, "full": " ".join(toks), "core": " ".join(core(toks)),
+        p = {"toks": toks, "full": " ".join(toks), "core": " ".join(core(toks)), "glued": "".join(toks),
              "hints": sorted({prov_tok[t] for t in toks if t in prov_tok}), "max_mw": float(r.max_hourly_mw_30d)}
         fam = r.plant_family if r.plant_family in FAMILIES else None
         if pd.isna(r.plant_family):
