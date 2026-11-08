@@ -13,9 +13,11 @@ import { DEFAULT_SOURCE_ORDER, SOURCE_PALETTE } from "./constants";
 
 /**
  * Tek veri yükleme noktası.
- * İleride gerçek veri yoluna (/data/*.json) geçildiğinde yalnızca bu sabit değişir.
+ * VITE_DATA_BASE_URL tanımlıysa oradan (GCS kovası vb.), boşsa yerel örnek veriden (${BASE_URL}data/sample) okunur.
  */
-export const DATA_BASE_URL = "/data/sample";
+export const DATA_BASE_URL = import.meta.env.VITE_DATA_BASE_URL?.trim()
+  ? import.meta.env.VITE_DATA_BASE_URL.trim().replace(/\/+$/, "")
+  : `${import.meta.env.BASE_URL}data/sample`;
 
 export type DashboardMode = "live" | "playback";
 export type PlaybackSpeed = 1 | 2 | 4;
@@ -150,7 +152,7 @@ export async function loadDashboardData(
     fetchJson<Provinces24H>("provinces_24h.json", signal),
     fetchJson<Plants>("plants.json", signal),
     fetchJson<Generation24H>("generation_24h.json", signal),
-    fetch("/geo/neighbors.geojson", { signal })
+    fetch(`${import.meta.env.BASE_URL}geo/neighbors.geojson`, { signal })
       .then((res) =>
         res.ok ? (res.json() as Promise<GeoJSON.FeatureCollection>) : null
       )
