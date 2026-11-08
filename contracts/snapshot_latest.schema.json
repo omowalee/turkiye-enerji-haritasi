@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "0.1",
+      "const": "0.2",
       "description": "Sözleşme sürümü."
     },
     "generated_at": {
@@ -129,6 +129,27 @@
         },
         "provisional": {
           "$ref": "#/$defs/SnapshotProvisional"
+        },
+        "consumption_mw": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Kesinleşmiş saatin tüketimi. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null."
+        },
+        "net_import_mw": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Kesinleşmiş saatin net dış ticareti. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez."
+        },
+        "balance_mw": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Kesinleşmiş saatin dengesi. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir."
         }
       }
     },
@@ -176,6 +197,27 @@
         "plant_count": {
           "type": "integer",
           "description": "O gün üretimi sıfırdan büyük santral sayısı."
+        },
+        "consumption_mw": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Santral gününün son saatinde (last_hour_ts) tüketim. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null."
+        },
+        "net_import_mw": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Aynı saatte net dış ticaret. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez."
+        },
+        "balance_mw": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Aynı saatte ülke lisanslı üretimi - tüketim. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir."
         }
       }
     },

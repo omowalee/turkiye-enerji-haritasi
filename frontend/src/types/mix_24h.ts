@@ -12,7 +12,7 @@ export interface Mix24H {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1";
+  schema_version: "0.2";
   /**
    * Dosyanın üretildiği an (+03:00).
    */
@@ -59,6 +59,102 @@ export interface MixLive {
   ];
   mw: PerSourceSeries;
   ptf_tl_mwh: (number | null)[];
+  /**
+   * Saatlik tüketim. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null. Dizi `hours` ile hizalıdır.
+   *
+   * @minItems 24
+   * @maxItems 24
+   */
+  consumption_mw?: [
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null
+  ];
+  /**
+   * Saatlik net dış ticaret. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez. Dizi `hours` ile hizalıdır.
+   *
+   * @minItems 24
+   * @maxItems 24
+   */
+  net_import_mw?: [
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null
+  ];
+  /**
+   * Saatlik denge. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir. Dizi `hours` ile hizalıdır.
+   *
+   * @minItems 24
+   * @maxItems 24
+   */
+  balance_mw?: [
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null
+  ];
 }
 export interface MixPlantsDay {
   /**
@@ -99,4 +195,100 @@ export interface MixPlantsDay {
   ];
   mw: PerSourceSeries;
   ptf_tl_mwh: (number | null)[];
+  /**
+   * Saatlik tüketim. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null. Dizi `hours` ile hizalıdır.
+   *
+   * @minItems 24
+   * @maxItems 24
+   */
+  consumption_mw?: [
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null
+  ];
+  /**
+   * Saatlik net dış ticaret. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez. Dizi `hours` ile hizalıdır.
+   *
+   * @minItems 24
+   * @maxItems 24
+   */
+  net_import_mw?: [
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null
+  ];
+  /**
+   * Saatlik denge. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir. Dizi `hours` ile hizalıdır.
+   *
+   * @minItems 24
+   * @maxItems 24
+   */
+  balance_mw?: [
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null,
+    number | null
+  ];
 }

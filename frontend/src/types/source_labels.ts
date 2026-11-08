@@ -11,7 +11,7 @@ export interface SourceLabels {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1";
+  schema_version: "0.2";
   /**
    * Gösterim ve yığılma sırası.
    */

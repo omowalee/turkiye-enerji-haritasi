@@ -14,7 +14,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "0.1",
+      "const": "0.2",
       "description": "Sözleşme sürümü."
     },
     "generated_at": {
@@ -65,6 +65,42 @@
               "null"
             ]
           }
+        },
+        "consumption_mw": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Saatlik tüketim. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null. Dizi `hours` ile hizalıdır."
+        },
+        "net_import_mw": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Saatlik net dış ticaret. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez. Dizi `hours` ile hizalıdır."
+        },
+        "balance_mw": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Saatlik denge. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir. Dizi `hours` ile hizalıdır."
         }
       }
     },
@@ -101,6 +137,42 @@
               "null"
             ]
           }
+        },
+        "consumption_mw": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Saatlik tüketim. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null. Dizi `hours` ile hizalıdır."
+        },
+        "net_import_mw": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Saatlik net dış ticaret. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez. Dizi `hours` ile hizalıdır."
+        },
+        "balance_mw": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Saatlik denge. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir. Dizi `hours` ile hizalıdır."
         }
       }
     }

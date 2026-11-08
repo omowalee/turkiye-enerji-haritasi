@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "0.1",
+      "const": "0.2",
       "description": "Sözleşme sürümü."
     },
     "generated_at": {

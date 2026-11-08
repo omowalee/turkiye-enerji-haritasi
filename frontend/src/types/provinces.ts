@@ -9,7 +9,7 @@ export interface Provinces {
   /**
    * Sözleşme sürümü (RFC 7946 yabancı üye).
    */
-  schema_version: "0.1";
+  schema_version: "0.2";
   type: "FeatureCollection";
   features: ProvinceFeature[];
 }

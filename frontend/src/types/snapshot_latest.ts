@@ -11,7 +11,7 @@ export interface SnapshotLatest {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1";
+  schema_version: "0.2";
   /**
    * Dosyanın üretildiği an (+03:00).
    */
@@ -61,6 +61,18 @@ export interface SnapshotLive {
    */
   ptf_tl_mwh: number | null;
   provisional?: SnapshotProvisional;
+  /**
+   * Kesinleşmiş saatin tüketimi. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null.
+   */
+  consumption_mw?: number | null;
+  /**
+   * Kesinleşmiş saatin net dış ticareti. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez.
+   */
+  net_import_mw?: number | null;
+  /**
+   * Kesinleşmiş saatin dengesi. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir.
+   */
+  balance_mw?: number | null;
 }
 export interface SourceMw {
   /**
@@ -105,6 +117,18 @@ export interface SnapshotPlantsDay {
    * O gün üretimi sıfırdan büyük santral sayısı.
    */
   plant_count: number;
+  /**
+   * Santral gününün son saatinde (last_hour_ts) tüketim. Tüketim, MW (EPİAŞ gerçek zamanlı tüketim, rt-cons). Üretimden yaklaşık 1 saat sonra yayımlanır; henüz yoksa null.
+   */
+  consumption_mw?: number | null;
+  /**
+   * Aynı saatte net dış ticaret. Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamlarına girmez.
+   */
+  net_import_mw?: number | null;
+  /**
+   * Aynı saatte ülke lisanslı üretimi - tüketim. Denge = lisanslı üretim - tüketim, MW; tüketim yoksa null. Negatif değer gündüz çoğunlukla lisanssız (sayaç arkası) güneşten kaynaklanır (lisanslı üretimde yok, tüketimde var); dış ticaret değildir.
+   */
+  balance_mw?: number | null;
 }
 /**
  * Lisanssız güneş bilgi notu; aylık ve gecikmeli.

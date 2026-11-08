@@ -32,11 +32,16 @@ FILES = {  # dosya -> şema
     "snapshot_latest.json": "snapshot_latest", "plants.json": "plants", "generation_24h.json": "generation_24h",
     "mix_24h.json": "mix_24h", "provinces_24h.json": "provinces_24h", "provinces.geojson": "provinces", "source_labels.json": "source_labels",
 }
-VERSION = "0.1"
+VERSION = "0.2"
 
 # Sıra ve etiketler contracts/source_labels.json'dan (dbt seed source_types ile birebir aynı).
 LABELS = json.loads((CONTRACTS / "source_labels.json").read_text(encoding="utf-8"))
 SOURCES = LABELS["order"]
+
+
+def mw(v):
+    """MW -> int, NULL korunur."""
+    return None if v is None else int(round(v))
 
 
 def iso(dt_local) -> str:
@@ -127,10 +132,16 @@ def build(c, project: str):
             "by_source": {k: {"mw": v, "akkuyu": round(v / 1200, 2)} for k, v in live_by_source.items()},
             "ptf_tl_mwh": None if s.live_price_try_per_mwh is None else round(float(s.live_price_try_per_mwh), 2),
             "provisional": {"ts": iso(s.provisional_hour_start_tr), "total_mw": int(round(s.provisional_total_mw))},
+            "consumption_mw": mw(s.live_consumption_mw),
+            "net_import_mw": mw(s.live_net_import_mw),
+            "balance_mw": mw(s.live_balance_mw),
         },
         "plants_day": {"date": str(day), "last_hour_ts": iso(s.plants_day_last_hour_start_tr),
                        "total_mw_last_hour": int(round(s.plants_day_total_mw_last_hour)),
-                       "plant_count": int(s.plants_day_plant_count)},
+                       "plant_count": int(s.plants_day_plant_count),
+                       "consumption_mw": mw(s.plants_day_consumption_mw_last_hour),
+                       "net_import_mw": mw(s.plants_day_net_import_mw_last_hour),
+                       "balance_mw": mw(s.plants_day_balance_mw_last_hour)},
         "unlicensed_solar": {"month": s.unlicensed_solar_month.strftime("%Y-%m"),
                              "avg_mw": int(round(s.unlicensed_solar_avg_mw)),
                              "peak_mw": int(round(s.unlicensed_solar_peak_mw)), "source": "ren-ul-gen"},
@@ -182,9 +193,19 @@ def build(c, project: str):
     live_set, day_set = set(live_hours_tr), set(hours_tr)
     mix_live = series([(r.hour_start_tr, r.source_type, r.generation_mw) for r in src if r.hour_start_tr in live_set], live_hours_tr)
     mix_day = series([(r.hour_start_tr, r.source_type, r.generation_mw) for r in src if r.hour_start_tr in day_set], hours_tr)
+    bal = {r.hour_start_tr: r for r in q(f"""
+        select hour_start_tr, consumption_mw, net_import_mw, balance_mw
+        from {{marts}}.agg_country_balance_hourly`
+        where hour_start_at_utc between timestamp_sub(timestamp '{s.live_hour_start_at_utc}', interval 23 hour)
+                                    and timestamp '{s.live_hour_start_at_utc}'
+           or date_tr = date '{day}'""")}
+    balance = lambda hs: {k: [mw(getattr(bal[h], k)) if h in bal else None for h in hs]
+                          for k in ("consumption_mw", "net_import_mw", "balance_mw")}
     mix = {**head, "sources": [x for x in SOURCES if x in mix_live or x in mix_day],
-           "live": {"hours": [iso(h) for h in live_hours_tr], "mw": mix_live, "ptf_tl_mwh": ptf_list(live_hours_tr)},
-           "plants_day": {"date": str(day), "hours": hours, "mw": mix_day, "ptf_tl_mwh": ptf_list(hours_tr)}}
+           "live": {"hours": [iso(h) for h in live_hours_tr], "mw": mix_live, "ptf_tl_mwh": ptf_list(live_hours_tr),
+                    **balance(live_hours_tr)},
+           "plants_day": {"date": str(day), "hours": hours, "mw": mix_day, "ptf_tl_mwh": ptf_list(hours_tr),
+                          **balance(hours_tr)}}
 
     # iller ------------------------------------------------------------------------------------
     prov_mw: dict[int, list[float]] = {}  # 0 = konumsuz
@@ -238,7 +259,9 @@ def build(c, project: str):
     day_total = sum(sum(v) for v in gen.values())
     day_located = sum(sum(v) for pid, v in gen.items() if plant_by_id[pid]["lat"] is not None)
     mix_day_total = sum(sum(v) for v in mix_day.values())
-    notes = [f"live {snapshot['live']['ts']} ({snapshot['live']['total_mw']:,} MW), ön veri {snapshot['live']['provisional']['ts']}",
+    lv = snapshot["live"]
+    notes = [f"live {lv['ts']} ({lv['total_mw']:,} MW), ön veri {lv['provisional']['ts']}; tüketim {lv['consumption_mw']}, "
+             f"net ithalat {lv['net_import_mw']}, denge {lv['balance_mw']} MW",
              f"santral günü {day}; plants.json {len(plants)} santral, gün içinde üreten {len(gen)}",
              f"konumlu santral {len(located)}/{len(plants)} ({sum(p['match']['source'] == 'gem' for p in located)} GEM, "
              f"{sum(p['match']['source'] == 'osm' for p in located)} OSM); kurulu gücü dolu {sum(p['capacity_mw'] is not None for p in located)}",

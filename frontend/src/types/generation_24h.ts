@@ -11,7 +11,7 @@ export interface Generation24H {
   /**
    * Sözleşme sürümü.
    */
-  schema_version: "0.1";
+  schema_version: "0.2";
   /**
    * Dosyanın üretildiği an (+03:00).
    */
