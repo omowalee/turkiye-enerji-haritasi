@@ -10,3 +10,5 @@ openpyxl
 shapely
 pytest
 jsonschema
+dbt-core==1.11.17
+dbt-bigquery==1.12.2

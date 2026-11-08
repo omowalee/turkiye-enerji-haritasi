@@ -1,0 +1,42 @@
+version: 2
+
+sources:
+  - name: epias_raw
+    description: >
+      Python hattının yüklediği EPİAŞ ham tabloları (BigQuery dataset epias_raw).
+      Zaman damgaları (ts) saatin BAŞLANGICIDIR, UTC. date_local = İstanbul yerel günü.
+    schema: epias_raw
+    tables:
+      - name: realtime_generation_source
+        description: "rt-gen: kaynak bazlı ülke üretimi, saatlik (lisanslı, importExport içerir). Bölümleme: date_local."
+        config:
+          loaded_at_field: ts
+          freshness:
+            warn_after: {count: 3, period: hour}
+            error_after: {count: 6, period: hour}
+      - name: realtime_generation_plant
+        description: "rt-gen-bulk: santral bazlı saatlik üretim (lisanslı). Bölümleme: date_local, kümeleme: pp_id. Veri en erken ertesi gün gelir."
+        config:
+          loaded_at_field: ts
+          freshness:
+            warn_after: {count: 36, period: hour}
+            error_after: {count: 48, period: hour}
+      - name: market_clearing_price
+        description: "mcp: gün öncesi piyasa takas fiyatı (PTF), saatlik. Ertesi günün fiyatı da önceden gelir."
+      - name: unlicensed_generation
+        description: "ren-ul-gen: lisanssız üretim, kaynak bazlı ülke toplamı, saatlik. Aylık yayımlanır (5-6 hafta gecikme)."
+      - name: power_plants
+        description: "pp-list: EPİAŞ santral listesi, günlük snapshot (snapshot_date)."
+      - name: load_log
+        description: Yükleme günlüğü (hangi tablo/bölüm ne zaman yüklendi).
+
+  - name: geo_raw
+    description: Dış konum kaynakları (BigQuery dataset geo_raw).
+    schema: geo_raw
+    tables:
+      - name: gem_plants
+        description: Global Energy Monitor Global Integrated Power Tracker, Türkiye, birim/faz düzeyinde (CC BY 4.0).
+      - name: osm_plants
+        description: OpenStreetMap power=plant öğeleri (Overpass), ODbL.
+      - name: provinces
+        description: geoBoundaries TUR ADM1, 81 il sınırı (CC BY-SA 2.0).

@@ -1,0 +1,16 @@
+epias_column,source_type
+sun,solar
+wind,wind
+dammedHydro,hydro_dam
+river,hydro_river
+geothermal,geothermal
+biomass,biomass
+naturalGas,natural_gas
+lng,natural_gas
+importCoal,imported_coal
+lignite,lignite
+blackCoal,lignite
+asphaltiteCoal,lignite
+fueloil,other
+naphta,other
+wasteheat,other

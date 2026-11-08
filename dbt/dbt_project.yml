@@ -1,0 +1,35 @@
+name: energy_map
+version: "0.1.0"
+config-version: 2
+
+flags:
+  send_anonymous_usage_stats: false
+  use_colors: false
+profile: energy_map
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # EPIAS can revise recent hours; incremental models reprocess this many hours back.
+  lookback_hours: 48
+  # Max share of national generation from unmatched plants (decision: 0.15 first, 0.10 after manual overrides).
+  max_unmatched_generation_share: 0.15
+
+models:
+  energy_map:
+    staging:
+      +materialized: view
+      +schema: epias_staging
+    intermediate:
+      +materialized: view
+      +schema: epias_staging
+    marts:
+      +schema: epias_marts
+
+seeds:
+  energy_map:
+    +schema: epias_staging

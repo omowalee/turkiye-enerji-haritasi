@@ -1,0 +1,69 @@
+version: 2
+
+seeds:
+  - name: source_types
+    description: >
+      Kontrollü kaynak türü sözlüğü (tek tanım). Anahtarlar, etiketler ve sıra
+      contracts/source_labels.json ile birebir aynıdır; biri değişirse ikisi birlikte değişir.
+      Grain: bir satır = bir source_type.
+    config:
+      column_types:
+        source_type: string
+        label_tr: string
+        is_renewable: boolean
+        sort_order: int64
+    columns:
+      - name: source_type
+        description: Kontrollü sözlük anahtarı (İngilizce snake_case).
+        data_tests: [unique, not_null]
+      - name: label_tr
+        description: Panelde gösterilen Türkçe etiket.
+        data_tests: [not_null]
+      - name: is_renewable
+        description: Yenilenebilir mi (sözleşme tanımı, source_labels.json).
+        data_tests: [not_null]
+      - name: sort_order
+        description: Grafiklerde yığılma ve gösterim sırası (1 = ilk).
+        data_tests: [unique, not_null]
+
+  - name: epias_fuel_map
+    description: >
+      EPİAŞ yakıt kolonu → source_type eşlemesi. importExport ve total bilerek yok
+      (total dış ticareti içerir). Grain: bir satır = bir EPİAŞ yakıt kolonu.
+    config:
+      column_types:
+        epias_column: string
+        source_type: string
+    columns:
+      - name: epias_column
+        description: EPİAŞ rt-gen / rt-gen-bulk kolon adı (büyük/küçük harf duyarlı).
+        data_tests: [unique, not_null]
+      - name: source_type
+        description: Karşılık gelen kaynak türü.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('source_types')
+                field: source_type
+
+  - name: unlicensed_fuel_map
+    description: >
+      Lisanssız üretim (ren-ul-gen) kolonu → source_type eşlemesi. toplam bilerek yok.
+      Grain: bir satır = bir lisanssız üretim kolonu.
+    config:
+      column_types:
+        unlicensed_column: string
+        source_type: string
+    columns:
+      - name: unlicensed_column
+        description: ren-ul-gen ham kolon adı.
+        data_tests: [unique, not_null]
+      - name: source_type
+        description: Karşılık gelen kaynak türü.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('source_types')
+                field: source_type

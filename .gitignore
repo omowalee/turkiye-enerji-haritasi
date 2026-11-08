@@ -43,3 +43,4 @@ BASLANGIC.md
 
 # Node
 contracts/node_modules/
+dbt/.user.yml

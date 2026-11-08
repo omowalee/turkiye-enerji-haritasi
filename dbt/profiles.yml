@@ -1,0 +1,14 @@
+# Project-local profile, no secrets: credentials come from env vars (loaded from repo-root .env by scripts/dbt.sh).
+energy_map:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: epias_staging
+      location: EU
+      threads: 4
+      priority: interactive
+      job_execution_timeout_seconds: 300

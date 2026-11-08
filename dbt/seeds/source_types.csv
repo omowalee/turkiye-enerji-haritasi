@@ -1,0 +1,12 @@
+source_type,label_tr,is_renewable,sort_order
+solar,Güneş,true,1
+wind,Rüzgâr,true,2
+hydro_dam,Hidro (barajlı),true,3
+hydro_river,Hidro (akarsu),true,4
+geothermal,Jeotermal,true,5
+biomass,Biyokütle,true,6
+natural_gas,Doğalgaz,false,7
+imported_coal,İthal kömür,false,8
+lignite,Linyit ve yerli kömür,false,9
+nuclear,Nükleer,false,10
+other,Diğer,false,11
