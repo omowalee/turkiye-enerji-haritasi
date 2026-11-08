@@ -95,3 +95,51 @@ seeds:
           - accepted_values:
               arguments:
                 values: ['gas', 'hydro', 'coal', 'solar', 'wind', 'geothermal', 'bio', 'other']
+
+  - name: plant_match_candidates
+    description: >
+      ÜRETİLMİŞ DOSYA, elle düzenlenmez: `python -m scripts.match_plants` yazar. Her EPİAŞ santrali
+      için aynı yakıt ailesindeki en iyi GEM/OSM konum adayı (eşik uygulanmamış; eşik
+      int_plants_matched'te var match_min_score ile uygulanır). Adayı olmayan santral satırsızdır.
+      Grain: bir satır = bir plant_id.
+    config:
+      column_types:
+        plant_id: int64
+        location_source: string
+        location_id: string
+        score: float64
+        method: string
+    columns:
+      - name: plant_id
+        description: EPİAŞ santral kimliği.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_epias__power_plants')
+                field: plant_id
+      - name: location_source
+        description: "'gem' veya 'osm'."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['gem', 'osm']
+      - name: location_id
+        description: stg_plant_locations.location_id.
+        data_tests: [not_null]
+      - name: score
+        description: Düzeltilmiş benzerlik puanı, 0-100 (bkz. scripts/match_plants.py başlığı).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: method
+        description: "'exact_name' (normalize adlar aynı, puan 100) veya 'fuzzy_name'."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['exact_name', 'fuzzy_name']
