@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  /* Primitive & Semantic Control Room Surfaces */
+  --bg-canvas: #060A12;
+  --bg-map-land: #0B111E;
+  --bg-surface: #0D1422;
+  --bg-elevated: #151F32;
+  --bg-glass: rgba(13, 20, 34, 0.88);
+
+  /* Borders */
+  --border-subtle: #1E293B;
+  --border-strong: #334155;
+
+  /* Typography Colors */
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+
+  /* Accents & Status */
+  --accent-live: #10B981;
+  --accent-playback: #38BDF8;
+  --status-warning: #F59E0B;
+  --status-warning-bg: #451A03;
+  --status-error: #F87171;
+  --status-error-bg: #450A0A;
+
+  /* 11 Energy Source Colors (from docs/tasarim-onerisi.md) */
+  --source-solar: #FACC15;
+  --source-wind: #22D3EE;
+  --source-hydro-dam: #3B82F6;
+  --source-hydro-river: #93C5FD;
+  --source-geothermal: #F43F5E;
+  --source-biomass: #4ADE80;
+  --source-natural-gas: #F97316;
+  --source-imported-coal: #CBD5E1;
+  --source-lignite: #64748B;
+  --source-nuclear: #A855F7;
+  --source-other: #D4A373;
+
+  /* Font Stacks */
+  --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-sans-ui {
+  font-family: var(--font-sans);
+}
+
+.font-mono-data {
+  font-family: var(--font-mono);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* Subtle scrollbar for source strip on smaller viewports */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-canvas);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
