@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://KULLANICI.github.io"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Encoding"],
+    "maxAgeSeconds": 3600
+  }
+]

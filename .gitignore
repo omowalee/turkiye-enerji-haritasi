@@ -49,3 +49,7 @@ dbt/.user.yml
 frontend/node_modules/
 frontend/dist/
 .agy/
+
+# Docker / yerel yayın
+secrets/
+build/
