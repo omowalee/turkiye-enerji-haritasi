@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: stg_plant_locations
+    description: >
+      Grain: bir satır = bir konum kaynağı (location_source: 'gem' | 'osm') x bir konum
+      (location_id). Dış konum kaynaklarının birleşik, normalize görünümü; eşleştirme
+      (int_plants_matched) girdisidir.
+      GEM (CC BY 4.0): yalnızca status = 'operating' birimler, gem_location_id düzeyinde
+      toplanır (kapasite toplamı, koordinat ortalaması; ad ve yakıt ailesi konumdaki en büyük
+      birimden). OSM (ODbL): power=plant öğeleri, location_id = "<osm_type>/<osm_id>".
+      Yakıt ailesi iki kaynakta aynı kümeyle kodlanır (gas, hydro, coal, solar, wind,
+      geothermal, bio); haritası olmayan türler (nükleer, batarya vb.) NULL kalır.
+      OSM kapasitesi yalnızca plant:output:electricity "sayı + kW/MW/GW" ise ayrıştırılır, aksi halde NULL.
+    columns:
+      - name: location_source
+        description: "Konum kaynağı: 'gem' veya 'osm'."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['gem', 'osm']
+      - name: location_id
+        description: "Kaynak içi kimlik: GEM için gem_location_id, OSM için '<osm_type>/<osm_id>'."
+        data_tests: [not_null]
+      - name: location_name
+        description: Ana ad (GEM plant_project_name; OSM name etiketi). OSM'de bazen NULL.
+      - name: location_name_local
+        description: Yerel ad (GEM plant_project_name_local; OSM name:tr). Çoğunlukla NULL.
+      - name: location_name_other
+        description: Diğer adlar (GEM plant_project_name_other; OSM alt_name).
+      - name: plant_family
+        description: "Kaba yakıt ailesi: gas, hydro, coal, solar, wind, geothermal, bio (veya NULL)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['gas', 'hydro', 'coal', 'solar', 'wind', 'geothermal', 'bio']
+      - name: capacity_mw
+        description: Kurulu güç, MW (GEM'de operating birimlerin toplamı; OSM'de ayrıştırılabilirse, aksi halde NULL).
+      - name: latitude
+        description: Enlem, derece (WGS84). Türkiye için 35-43 beklenir (aralık dışı uyarı verir).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 35
+                max_value: 43
+              config:
+                severity: warn
+      - name: longitude
+        description: Boylam, derece (WGS84). Türkiye için 25-45,5 beklenir (aralık dışı uyarı verir).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 25
+                max_value: 45.5
+              config:
+                severity: warn
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [location_source, location_id]
+
+  - name: stg_provinces
+    description: >
+      Grain: bir satır = bir il (plate_code), geoBoundaries TUR ADM1 (CC BY-SA 2.0), 81 satır.
+      İl ataması koordinattan nokta-poligon yöntemiyle (ST_CONTAINS) yapılır, GEM'in il alanından değil.
+    columns:
+      - name: plate_code
+        description: İl plaka kodu (1-81).
+        data_tests: [unique, not_null]
+      - name: province_name
+        description: İl adı.
+        data_tests: [not_null]
+      - name: iso_code
+        description: ISO 3166-2 kodu (TR-01 ... TR-81).
+        data_tests: [unique, not_null]
+      - name: geom
+        description: İl sınırı (GEOGRAPHY, WGS84).
+        data_tests: [not_null]
