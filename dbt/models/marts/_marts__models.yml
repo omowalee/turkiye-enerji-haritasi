@@ -281,3 +281,35 @@ models:
       - name: unlicensed_solar_peak_mw
         description: O ayda yerel saat başına ortalamaların en büyüğü, MW ("öğlen tepe").
         data_tests: [not_null]
+
+  - name: agg_country_balance_hourly
+    description: >
+      Grain: bir satır = bir saat (ülke dengesi). Saatler ülke üretim verisinden (rt-gen); tüketim (rt-cons)
+      ve net dış ticaret (importExport) saate eklenir. Tüketim rt-gen'den ~1 saat sonra yayımlandığı için en yeni
+      saatlerde consumption_mw ve balance_mw NULL olabilir (6 saatten eskide warn_consumption_missing uyarır).
+      Gece tutarlılığı: lisanslı üretim + net ithalat ≈ tüketim (warn_night_balance_inconsistent, %3).
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC.
+        data_tests: [unique, not_null]
+      - name: hour_start_tr
+        description: Saatin BAŞLANGICI, İstanbul yerel saati (DATETIME).
+        data_tests: [not_null]
+      - name: date_tr
+        description: İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: licensed_generation_mw
+        description: Lisanslı yurt içi üretim, MW (dış ticaret hariç) = agg_generation_by_source_hourly.total_generation_mw.
+        data_tests: [not_null]
+      - name: consumption_mw
+        description: Gerçek zamanlı tüketim, MW (rt-cons). Henüz yayımlanmadıysa NULL.
+      - name: net_import_mw
+        description: Net dış ticaret, MW. + = net ithalat, - = net ihracat. Üretim toplamına girmez.
+        data_tests: [not_null]
+      - name: balance_mw
+        description: >
+          licensed_generation_mw - consumption_mw, MW. Tüketim yoksa NULL. Negatif değer gündüz çoğunlukla
+          lisanssız (sayaç arkası) güneşten gelir (lisanslı üretimde yok, tüketimde var); dış ticaret değildir.
+      - name: is_finalized
+        description: Saat kesinleşmiş mi (ülke verisindeki en yeni saat değil).
+        data_tests: [not_null]
