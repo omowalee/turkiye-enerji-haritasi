@@ -6,12 +6,12 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 
 - Sürüm: 1
 - Tamamlanan: Aşama 0 (keşif), Aşama 1 (veri çekme, 90 gün geçmiş), sözleşme v0
-- Devam eden: Aşama 2 (dbt) — Claude Code · Frontend: agy CLI kurulumu bekleniyor (worktree `../a-frontend` hazır)
+- Devam eden: Aşama 2 (dbt; staging bitti, sırada eşleştirme) — Claude Code · Frontend: agy kurulu, preflight geçti; tasarım önerisi izin kuralı onayını bekliyor
 - Alınmış kararlar: `AGENTS.md` → "Alınmış ürün kararları"
 
 ## Veri tarafı (Claude Code)
 
-- Son güncelleme: 2026-11-08 (sözleşme v0 revize edildi, Aşama 2 başladı)
+- Son güncelleme: 2026-11-08 (Aşama 2 bölüm 1: dbt kurulumu + staging bitti)
 - Yapılanlar:
   - `pipeline/epias`: 5 EPİAŞ servisi. `pipeline/bq` ve `jobs`: `epias_raw` tablolarına `date_local` bölümlü idempotent yükleme.
   - `geo_raw`: GEM 4.131, OSM 1.796, il sınırları 81 satır.
@@ -29,14 +29,21 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Revizyon (8b0fbe1): İngilizce kaynak anahtarları + `contracts/source_labels.json` (Türkçe etiketler), `schema_version: "0.1"`, kesinleşmiş saat kuralı + `live.provisional`.
   - Tek doğrulama komutu: `.venv/Scripts/python -X utf8 -m scripts.check` (dışa aktar → şema → tip senkronu → frontend typecheck/build). Son sonuç: hepsi geçti (frontend yok, atlandı).
   - Worktree: `../a-frontend` (`frontend` branch, 8b0fbe1'den).
+- Aşama 2 bölüm 1 (9ab0aab…eb0b1d3):
+  - dbt-core 1.11.17 + dbt-bigquery 1.12.2 (1.12.x kurulumu GitHub 504 ile düştü), dbt_utils 1.3.3. Proje `dbt/`, profil `dbt/profiles.yml` (sırsız, `.env`'den okur). Çalıştırma: `./scripts/dbt.sh build`.
+  - Dataset: `epias_staging` (staging, intermediate, seed), `epias_marts` (mart). Seed: `source_types` (contracts/source_labels.json ile birebir), `epias_fuel_map`, `unlicensed_fuel_map`. Unpivot dinamik; yeni EPİAŞ kolonu (ör. nükleer) uyarı testine düşer.
+  - Staging (view): generation_by_source 21.720, generation_by_plant 2.533.647 (sıfırlar atıldı), power_plants 1.835, market_clearing_price 2.184, unlicensed_generation 7.320, plant_locations (gem 3.294 + osm 1.796), provinces 81.
+  - Doğrulama: tam `dbt build` PASS=64, WARN=0, ERROR=0; santral toplamı = ülke toplamı testi 5 tam günde geçti. `dbt source freshness` geçti.
+  - Notlar: `eic` tekil değil (TUTES-A/B), eşleştirmede anahtar olamaz. OSM'de 513 satır adsız, 1.104 satırda kapasite yok. Plant view'ı tarih filtresiz ~0,7 GB tarar, mart'lar `date_tr` filtrelemeli.
 - Açık sorular:
+  - Tazelik eşiği: kaynak verisinin normal yaşı 1,7–2,7 sa; 3 sa uyarı eşiği ~20 dk pay bırakıyor, küçük gecikmede uyarı verir. Eşik değişmedi (karar kullanıcıda).
   - ~~Son saat eksik geliyor~~ → **karar verildi (2026-11-08):** `live.ts` = ülke verisindeki en son saatten bir önceki saat; en son saat `live.provisional` alanında. Aşama 2'de dbt kuralı + test.
-  - **agy CLI kurulu değil** → frontend otomatik akışı bekliyor. Kurulum: `irm https://antigravity.google/cli/install.ps1 | iex` (kaynağı doğrulanmalı).
+  - agy 1.5.3 kurulu (`/c/Users/numan/AppData/Local/agy/bin/agy.exe`), preflight geçti. Headless çalıştırmada `python .agents/skills/ui-ux-pro-max/scripts/search.py` komutu izin olmadığı için reddedildi; dar izin kuralı (`--settings .agy/settings.json`, oturuma özel) kullanıcı onayında. `--dangerously-skip-permissions` kullanılmayacak.
   - v0 eşleştirmesi geçici: %82,4 konumlu üretim, yanlış pozitif örneği "KARAKAYA HES TRABZON" → Diyarbakır.
   - Örnek export yerel `data/raw/` (git dışı) dosyalarına bağlı. dbt sonrası export mart'lardan okuyacak.
   - eptr2 hata türlerini ayırmıyor, tekrar deneme kararı mesaj metnine bakıyor (kırılgan).
   - Ham kolonlar NULL olabiliyor, `not_null` kontrolü dbt testlerinde yapılacak.
-- Sıradaki: Aşama 2 (dbt): kurulum + staging → eşleştirme (en büyük 200 + override seed) → intermediate → marts.
+- Sıradaki: Aşama 2 bölüm 2 — `int_plants_matched` (Opus, Claude limiti yenilenince): en büyük 200 santral + `seeds/plant_match_overrides.csv`. Sonra intermediate → marts → kesinleşmiş saat testi.
 
 ## Frontend (Antigravity)
 
