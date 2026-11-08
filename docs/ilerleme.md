@@ -90,7 +90,8 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Linyit (`#A8A29E`) ile diğer (`#D4A373`) arasında parlaklık farkı yok (1,12:1). Renk körlüğünde karışabilir.
   - İki modlu oynatma: Canlı / Oynatma seçici, zaman çubuğu (oynat/duraklat, hız, imleç), yuvarlanan sayaçlar. Commit'i aşağıdaki birleştirme günlüğünde.
   - **Geri dönüş noktası:** git tag `gorsel-v1-kontrol-odasi`. Görsel yön bundan sonra baştan değişecek.
-- Sıradaki: yeni görsel yön (prompt'u kullanıcı veriyor) → kaynak grafiği → il paneli → mobil.
+  - Yeni görsel yön (312fd55): il düzeyinde 3D yığın (StackedSolidPolygonLayer, renk sırası düzeltildi), sol üst HUD'da lisanslı toplam + tüketim + dış ticaret cümlesi (tüketim yoksa "—"), kaynak şeridi ve kaynak filtresi, kaynak karışımı grafiği, il yüzen paneli, bilgi çekmecesi, ekran görüntüleri `frontend/docs/ekran/`.
+- Sıradaki: GitHub Pages hazırlığı (Vite `base` + `VITE_DATA_BASE_URL`, prompt kullanıcıda) → push.
 
 ## Sözleşme istekleri
 
@@ -106,3 +107,4 @@ Frontend'in ihtiyaç duyduğu yeni alanlar buraya yazılır. Veri tarafı şemay
 | 2026-11-08 | frontend: tasarım önerisi + iskelet (fda748b, d90d602) | scripts.check: hepsi geçti |
 | 2026-11-08 | frontend: 3D sütunlar (b6f023f) | scripts.check: hepsi geçti |
 | 2026-11-08 | frontend: iki modlu oynatma (tag gorsel-v1-kontrol-odasi) | scripts.check: hepsi geçti |
+| 2026-11-08 | frontend: yeni görsel yön + tüketim satırları (312fd55); örnek veri yenilendi (dc8e0a1) | scripts.check: hepsi geçti |
