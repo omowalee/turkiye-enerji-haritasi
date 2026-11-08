@@ -43,18 +43,18 @@ Gösterim ve yığılma sırası `contracts/source_labels.json` dosyasındaki `o
 | 6 | `biomass` | Biyokütle | Evet | `#4ADE80` | **Canlı Yeşil** — Organik kaynak; camgöbeğinden (`wind`) sıcak yeşil tonuyla ayrılır | **10.3:1** | 9.3:1 |
 | 7 | `natural_gas` | Doğalgaz | Hayır | `#F97316` | **Turuncu** — Alev turuncusu; sarı (`#FACC15`) ve mercandan (`#F43F5E`) net ayrılır | **7.5:1** | 6.8:1 |
 | 8 | `imported_coal` | İthal kömür | Hayır | `#CBD5E1` | **Gri (Açık Çelik/Gümüş)** — Kömür ailesinin açık tonu; koyu zeminde yüksek görünürlük | **11.4:1** | 10.3:1 |
-| 9 | `lignite` | Linyit ve yerli kömür | Hayır | `#64748B` | **Gri (Koyu Kül/Arduvaz)** — `imported_coal` ile aynı gri ailesinden, **2.8:1** iç kontrastla ayrılır | **4.1:1** | 3.7:1 |
+| 9 | `lignite` | Linyit ve yerli kömür | Hayır | `#A8A29E` | **Gri (Sıcak Taş/Kül — Stone 400)** — `imported_coal` (`#CBD5E1`) ile aynı gri ailesinden, sıcak taş tonu ve parlaklık farkıyla ayrılır | **7.9:1** | 7.3:1 |
 | 10 | `nuclear` | Nükleer | Hayır | `#A855F7` | **Mor (Ametist)** — Radyasyon/füzyon çağrışımlı doygun mor (henüz veri yoksa 0/gizli) | **5.4:1** | 4.9:1 |
 | 11 | `other` | Diğer | Hayır | `#D4A373` | **Sıcak Bronz / Kum Taşı** — Fuel-oil/atık ısı için soğuk grilerden ayrışan nötr toprak tonu | **8.6:1** | 7.8:1 |
 
 ### Mavi ve Gri Ailesi Ayrım Doğrulaması
 - **Hidro (`hydro_dam` `#3B82F6` vs `hydro_river` `#93C5FD`):** İkisi de saf mavi tonundadır (Hue ≈ `217°`), ancak bağıl parlaklıkları (`L=0.23` vs `L=0.55`) arasında **2.1:1** oranında ton farkı vardır. Yığılmış alan grafiğinde (stacked area) alt alta geldiklerinde ince bir `#060A12` (`1px`) kontur çizgisiyle desteklenir.
-- **Kömür (`imported_coal` `#CBD5E1` vs `lignite` `#64748B`):** İkisi de soğuk arduvaz gri ailesindendir (Slate 300 ve Slate 500). Parlaklıkları (`L=0.65` vs `L=0.17`) arasında **2.8:1** fark bulunur; böylece hem harita sütunlarında hem grafikte birbirine karışmaz.
+- **Kömür (`imported_coal` `#CBD5E1` vs `lignite` `#A8A29E`):** İkisi de gri ailesindendir; `imported_coal` soğuk çelik grisi (Slate 300), `lignite` ise sıcak taş/kül grisi (Stone 400, `#A8A29E`) olarak seçilmiştir. Hem koyu zeminde yüksek kontrast (**7.9:1**; `#0D1422` kart zemininde 7.3:1) sağlar hem de harita sütunlarında ve grafikte birbirinden net ayrılır.
 
 ### Koyu Zeminde Kontrast ve Renk Körlüğü (Protanopi / Deuteranopi) Değerlendirmesi
 1. **WCAG 2.2 Kontrast Uyumu:**
-   - Metin ve sayısal rozetlerde kullanılan tüm kaynak renkleri `#060A12` zemin üzerinde en az **4.1:1** (grafik bileşenleri için WCAG AA sınırı olan `3.0:1`'in üzerinde) kontrast sağlar.
-   - `lignite` (`#64748B`, `4.1:1`) metin olarak yazıldığında doğrudan kendi rengiyle değil, solunda `#64748B` renkli kare/daire ikon ve yanında `#F8FAFC` birincil metin ile gösterilir.
+   - Metin ve sayısal rozetlerde kullanılan tüm kaynak renkleri `#060A12` zemin üzerinde en az **5.1:1** (WCAG AA `4.5:1` metin ve `3.0:1` grafik sınırının üzerinde) kontrast sağlar.
+   - `lignite` (`#A8A29E`, `7.9:1`) solunda renkli kare/daire ikon ve yanında `#F8FAFC` birincil metin ile gösterilir.
 2. **Protanopi ve Deuteranopi (Kırmızı-Yeşil Renk Körlüğü) Analizi:**
    - Kırmızı-yeşil renk körlüğünde en kritik çakışma riski **Yeşil (`biomass`) — Turuncu (`natural_gas`) — Kırmızı (`geothermal`) — Sarı (`solar`)** eksenindedir.
    - Bu çakışmayı önlemek için dört kaynağa **farklı parlaklık (luminance) seviyeleri** atanmıştır:

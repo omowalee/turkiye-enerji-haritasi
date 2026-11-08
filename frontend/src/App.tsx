@@ -10,6 +10,9 @@ export function App() {
   const [data, setData] = useState<DashboardInitialData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Seçili saat indeksi tek bir state'te tutulur (0..23; şimdilik son saat: 23:00).
+  // Bir sonraki görevdeki 24 saatlik oynatma çubuğu bu state'i doğrudan güncelleyecek.
+  const [selectedHourIndex, setSelectedHourIndex] = useState<number>(23);
 
   const fetchAll = useCallback((signal?: AbortSignal) => {
     setLoading(true);
@@ -17,6 +20,7 @@ export function App() {
     loadDashboardData(signal)
       .then((result) => {
         setData(result);
+        setSelectedHourIndex(result.defaultHourIndex);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -74,14 +78,17 @@ export function App() {
             loading={loading}
           />
 
-          {/* Merkez: Türkiye İl Sınırları + Santral Noktaları Haritası */}
+          {/* Merkez: Türkiye İl Sınırları + Santral Noktaları ve 3D Sütunlar Haritası */}
           <TurkeyMap
             provincesGeoJson={data?.provincesGeoJson ?? null}
             plants={data?.locatedPlants ?? []}
             totalPlantsInCatalog={data?.totalPlantsInCatalog ?? 0}
             snapshot={data?.snapshot ?? null}
             sourceLabels={data?.sourceLabels ?? null}
-            lastHourTimestamp={data?.lastHourTimestamp ?? null}
+            selectedHourIndex={selectedHourIndex}
+            selectedHourTimestamp={
+              data?.hours[selectedHourIndex] ?? data?.lastHourTimestamp ?? null
+            }
             loading={loading}
           />
         </>

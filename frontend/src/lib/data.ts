@@ -24,6 +24,8 @@ export interface LocatedPlantPoint {
   lon: number;
   province: number | null;
   capacityMw: number | null;
+  /** 24 saatlik üretim dizisi (generation_24h.hours ile aynı sırada, MW) */
+  hourlyMw: readonly number[];
   lastHourMw: number;
   dailyTotalMwh: number;
 }
@@ -34,8 +36,16 @@ export interface DashboardInitialData {
   provincesGeoJson: Provinces;
   locatedPlants: LocatedPlantPoint[];
   totalPlantsInCatalog: number;
+  /** generation_24h.hours (24 adet ISO zaman damgası) */
+  hours: string[];
+  /** Varsayılan seçili saat indeksi (son saat: 23) */
+  defaultHourIndex: number;
   lastHourTimestamp: string;
 }
+
+const ZERO_HOURLY_MW: readonly number[] = Object.freeze(
+  new Array<number>(24).fill(0)
+);
 
 async function fetchJson<T>(fileName: string, signal?: AbortSignal): Promise<T> {
   const url = `${DATA_BASE_URL}/${fileName}`;
@@ -62,14 +72,18 @@ export async function loadDashboardData(
       fetchJson<Generation24H>("generation_24h.json", signal),
     ]);
 
-  const lastHourIndex = generation24h.hours.length - 1;
+  const lastHourIndex = Math.max(0, generation24h.hours.length - 1);
   const lastHourTimestamp =
     generation24h.hours[lastHourIndex] ?? snapshot.plants_day.last_hour_ts;
 
-  // plant_id -> { lastHourMw, dailyTotalMwh } hızlı arama tablosu
+  // plant_id -> { hourlyMw, lastHourMw, dailyTotalMwh } hızlı arama tablosu
   const generationByPlantId = new Map<
     number,
-    { lastHourMw: number; dailyTotalMwh: number }
+    {
+      hourlyMw: readonly number[];
+      lastHourMw: number;
+      dailyTotalMwh: number;
+    }
   >();
 
   for (let i = 0; i < generation24h.plant_ids.length; i++) {
@@ -81,7 +95,11 @@ export async function loadDashboardData(
     for (let h = 0; h < series.length; h++) {
       dailyTotalMwh += series[h] ?? 0;
     }
-    generationByPlantId.set(plantId, { lastHourMw, dailyTotalMwh });
+    generationByPlantId.set(plantId, {
+      hourlyMw: series,
+      lastHourMw,
+      dailyTotalMwh,
+    });
   }
 
   const locatedPlants: LocatedPlantPoint[] = [];
@@ -102,13 +120,14 @@ export async function loadDashboardData(
       lon: plant.lon,
       province: plant.province,
       capacityMw: plant.capacity_mw,
+      hourlyMw: gen?.hourlyMw ?? ZERO_HOURLY_MW,
       lastHourMw: gen?.lastHourMw ?? 0,
       dailyTotalMwh: gen?.dailyTotalMwh ?? 0,
     });
   }
 
   // Büyük santrallerin altında küçüklerin kaybolmaması ama çizim sırasının tutarlı olması için:
-  // Önce yüksek üretimli noktalar altta, küçükler üstte çizilsin (hover kolaylığı için)
+  // Önce yüksek üretimli noktalar altta, küçükler üstte çizilsin
   locatedPlants.sort((a, b) => b.lastHourMw - a.lastHourMw);
 
   return {
@@ -123,6 +142,8 @@ export async function loadDashboardData(
     provincesGeoJson,
     locatedPlants,
     totalPlantsInCatalog: plantsData.plants.length,
+    hours: generation24h.hours,
+    defaultHourIndex: lastHourIndex,
     lastHourTimestamp,
   };
 }

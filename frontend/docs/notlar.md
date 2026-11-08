@@ -45,3 +45,12 @@
   - Masaüstünde (`≥ 1024px`) 4 ana KPI kartı tek satırda, altında 11 kaynak kartı tek şeritte, ortada Türkiye haritası (`zoom: 5.45`) ve sol üstte yüzen veri/lisanssız güneş rozetleri yer alır.
   - Mobil genişlikte (`390px`) ana KPI kartları 2×2 ızgaraya, kaynak kartları 2 sütunlu kompakt ızgaraya dönüşür; harita `zoom: 4.05` ile tüm Türkiye'yi yatay taşma olmadan sığdırır ve lisanssız güneş notu `"Detay / Gizle"` düğmesiyle harita alanını kapatmaz.
 - **Sözleşme İsteği:** Mevcut `v0.1` veri sözleşmesinde bu aşama için eksik bir alan bulunmamaktadır.
+
+---
+
+## 4. İkinci Adım — 3D Sütunlar (`ColumnLayer`) ve Kamera Kontrolleri
+
+1. **3D Üretim Sütunları (`ColumnLayer`):** Yeni paket kurmadan mevcut `@deck.gl/layers` içindeki `ColumnLayer` kullanılarak koordinatı olan santrallerin üzerine seçili saatteki üretime (`generation_24h.mw[i][selectedHourIndex]`) göre yükselen ve kaynak rengiyle boyanan 3D sütunlar eklendi.
+2. **Karekök Yükseklik Ölçeği (`computeColumnElevationMeters`):** `1 MW` ile `~1.912 MW` arasındaki ~1:1900 dinamik aralığı Türkiye ölçeğinde okunabilir kılmak için `4500 + sqrt(MW) * 3200` metre karekök ölçek uygulandı (`0 MW` santraller `0 m` kalır, `5 MW` ~11,6 km ile görünür olur, `1.500 MW` ~128,4 km ile ekrandan taşmadan yükselir).
+3. **Eğim, Döndürme ve 2D/3D Geçişi:** Masaüstünde (`>= 768px`) varsayılan `45°` eğim (3D), mobilde (`< 768px`) varsayılan `0°` düz görünüm (2D) ayarlandı; sağ tık veya `Ctrl + sürükle` ile döndürme/eğme (`dragRotate: true`) ve sağ altta `"2D / 3D"` geçiş düğmesi eklendi.
+4. **Tek Saat State'i ve Tıklamayla Açılan Santral Kartı:** Seçili saat indeksi (`selectedHourIndex`, şimdilik `23` / `23:00`) `App.tsx` içinde tek bir state'te tutuldu; santrale tıklandığında (`onClick`) ad, kaynak (Türkçe etiket), o saatteki `MW` ve kurulu güç (`null` ise `"bilinmiyor"`) bilgilerini `tr-TR` biçiminde gösteren kart açılacak şekilde güncellendi.

@@ -61,8 +61,8 @@ export const SOURCE_PALETTE: Record<SourceType, SourcePaletteItem> = {
     renewable: false,
   },
   lignite: {
-    hex: "#64748B",
-    rgb: [100, 116, 139],
+    hex: "#A8A29E",
+    rgb: [168, 162, 158],
     fallbackLabel: "Linyit ve yerli kömür",
     renewable: false,
   },
