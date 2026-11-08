@@ -29,7 +29,8 @@ chosen as (
         case
             when o.action = 'match' then 1.0
             when o.action is null and c.plant_id is not null then c.score / 100
-        end as match_confidence
+        end as match_confidence,
+        coalesce(o.action = 'match' and o.is_location_proxy, false) as is_location_proxy
     from profile as p
     left join {{ ref('plant_match_overrides') }} as o
         on p.plant_id = o.plant_id
@@ -79,6 +80,7 @@ select
     pv.plate_code,
     lc.match_method,
     lc.match_confidence,
+    lc.is_location_proxy,
     lc.latitude is not null as is_located
 from located as lc
 left join province as pv

@@ -1,47 +1,47 @@
-plant_id,plant_name,action,location_source,location_id,note
-662,ADA DGKÇS,match,gem,L100000405907,ADA = Enka Adapazarı DGKÇ (820 MW; EPİAŞ max 813 MW)
-700,ERDEMİR,match,gem,L100000407676,Karadeniz Ereğli Zonguldak santrali (191 MW); koordinat Erdemir sahasında; kayıt adı Erdemir değil
-867,TÜPRAŞ İZMİT,match,gem,L100001077552,Tesis kaydı yok; aynı sahadaki 'Izmit Rafinerisi Santrali solar project' kaydı konum vekili
-880,HAYAT KİMYA,no_match,,,GEM/OSM'de kayıt yok
-888,O.ANADOLU RAFİNERİ,match,osm,way/281627265,Orta Anadolu Rafinerisi = TÜPRAŞ Kırıkkale
-962,İZMİR DGKÇ,match,gem,L100000405909,"Enka İzmir DGKÇ (1580 MW, Aliağa)"
-966,RWE DENİZLİ DGKÇ,match,gem,L100000405929,Turcas Denizli = RWE-Turcas Denizli DGKÇ (797 MW); ad yalnız il adında ortak
-968,LODOS RES,no_match,,,GEM/OSM'de Lodos RES kaydı yok
-1176,MERSİN RES,match,gem,L100000921633,"GEM 'Mersin Mut wind farm' (Mut Ağaoğlu, 99,9 MW); EPİAŞ MUT RES ayrı santral"
-1241,İSDEMİR,no_match,,,İskenderun Demir Çelik için GEM/OSM kaydı yok
-1257,ENTEK KÖSEKÖY,match,gem,L100000405920,AES Entek Köseköy = İzmit-Köseköy santrali (112 MW)
-1436,PİRİNÇLİ HES,no_match,,,Bilinen yanlış pozitif: aday 'Pirinçlik HES' ayrı EPİAŞ santrali PİRİNÇLİK HES'e ait
-1473,MAREN JES,match,gem,L100001045039,"GEM 'Mehmet' kaydının diğer adı 'Maren maraş'; kapasite 24,8 MW < üretim 40 MW"
-1517,BANDIRMA3 RES,match,gem,L100000921472,Bilinen yanlış pozitif (Kandıra) düzeltildi: Bandirma-3 wind farm
-1760,SİLİVRİ RES,match,osm,relation/14577635,"Ad tam aynı; OSM kapasitesi (63 MW) eski, üretim 113 MW"
-1786,EFE JES,match,gem,L100000700046,Gürmat Efe santralleri Germencik; Efeler JES kaydı (161 MW)
-1881,ARDAHAN AKINCI HES,match,gem,L100000603577,"Akıncı Çıldır (Kayabeyi barajı, Ardahan); bulanık aday Tokat'taki Akıncı HES'ti (il cezası)"
-1927,KEN KİPAŞ JES,match,gem,L100001045001,Maren Ken Kipaş JES; aday çakışma kuralıyla düşmüştü
-1954,KARAKAYA HES TRABZON,no_match,,,Bilinen yanlış pozitif: GEM Karakaya Diyarbakır'daki büyük baraj; Trabzon'daki santral için kayıt yok
-2030,KURTKAYASI RES,match,gem,L100000921621,"Ad tam aynı; GEM kapasitesi (46 MW) eski, üretim 68 MW"
-2085,AFYON1 BİYOGAZ,match,gem,L100000831205,Bilinen yanlış pozitif (Eber) düzeltildi: GEM 'Afyon-1 Biyogaz Santrali solar project' aynı tesis adını taşıyor
-2126,KEN-3 JES,match,gem,L100001045001,GEM Ken Kipas kaydının diğer adı 'Maren Ken Kipaş-3'
-2127,MEHMETHAN JES,match,gem,L100001045039,GEM 'Mehmet' kaydının diğer adı 'Mehmet Han'; MAREN JES ile aynı kayıt
-2159,AİRRES-4,match,gem,L100000921428,"Air Wind Farm 4; GEM kapasitesi (61 MW) eski, üretim 132 MW"
-2170,KIRIKKALE DGKÇ,match,gem,L100000405932,Yahşihan = ACWA Power Kırıkkale DGKÇ (927 MW)
-2216,EFE6 JES,match,gem,L100000700046,Gürmat Efe santralleri Germencik; Efeler JES kaydı
-2233,ITC ANTALYA BİYOKÜTLE,match,gem,L100001048319,"GEM Antalya biyokütle santrali (28,3 MW; EPİAŞ max 28 MW)"
-2335,EFE7 JES,match,gem,L100000700046,Gürmat Efe santralleri Germencik; Efeler JES kaydı
-2421,TÜPRAŞ İZMİR,match,gem,L100001077551,Tesis kaydı yok; aynı sahadaki 'Aliaga Rafinerisi Santrali solar project' kaydı konum vekili
-2448,HASANOBA RES,match,gem,L100000921566,"Ad tam aynı; GEM kapasitesi (51 MW) eski, üretim 75 MW"
-2479,GÜLPINAR RES,no_match,,,Gülpınar RES kaydı yok; aday Gülpir (34 MW) kapasiteyle uyumsuz
-2579,KARAPINAR YEKA-1 GES,match,gem,L100000831378,Karapınar YEKA GES sahası (1350 MW); MEKE GES ile aynı saha
-2588,EVRENCİK RES,match,gem,L100000921528,"Ad tam aynı; GEM kapasitesi (120 MW) eski, üretim 170 MW"
-2711,SOĞANLI RES,match,osm,relation/17564704,"Ad tam aynı; OSM kapasitesi (61,5 MW) eski, üretim 99 MW"
-2714,EFE8 JES,match,gem,L100000700046,Gürmat Efe santralleri Germencik; Efeler JES kaydı
-2772,NEZİHE BEREN JES,match,gem,L100001026020,Maren Nezihe Beren JES
-2784,İSTAÇ BES,match,osm,relation/20385825,İSTAÇ Odayeri atık tesisi (OSM 78 MW; EPİAŞ max 75 MW); Kemerburgaz yakma tesisi de 1-2 km yakında
-2798,KARAPINAR YEKA-1 MEKE GES,match,gem,L100000831378,Karapınar YEKA GES sahası (1350 MW); üç EPİAŞ santrali aynı sahada
-2960,ETİ BAKIR MAZIDAĞI TES,no_match,,,"Tesis kaydı yok; 'Eti Bakır 2 GES' Mazıdağı'na ~14 km, vekil olarak kullanılmadı"
-2995,ERCİYES RES,no_match,,,GEM/OSM'de kayıt yok
-3132,UYGAR RES,match,gem,L100000921721,"Ad tam aynı; GEM kapasitesi (163 MW) eski, üretim 248 MW"
-3156,R3-MALATYA-1 RES,no_match,,,GEM/OSM'de kayıt yok
-3158,PELİT RES,no_match,,,GEM/OSM'de kayıt yok; aday Cerit yanlış
-3180,KESTANEDERESİ RES,no_match,,,GEM/OSM'de kayıt yok
-3198,ELMACIK RES,no_match,,,GEM/OSM'de kayıt yok
-3214,G24-KARAPINAR GES,match,gem,L100000831378,Karapınar YEKA GES sahası (1350 MW); üç EPİAŞ santrali aynı sahada
+plant_id,plant_name,action,location_source,location_id,is_location_proxy,note
+662,ADA DGKÇS,match,gem,L100000405907,false,ADA = Enka Adapazarı DGKÇ (820 MW; EPİAŞ max 813 MW)
+700,ERDEMİR,match,gem,L100000407676,false,Karadeniz Ereğli Zonguldak santrali (191 MW); koordinat Erdemir sahasında; kayıt adı Erdemir değil
+867,TÜPRAŞ İZMİT,match,gem,L100001077552,true,Tesis kaydı yok; aynı sahadaki 'Izmit Rafinerisi Santrali solar project' kaydı konum vekili
+880,HAYAT KİMYA,no_match,,,false,GEM/OSM'de kayıt yok
+888,O.ANADOLU RAFİNERİ,match,osm,way/281627265,false,Orta Anadolu Rafinerisi = TÜPRAŞ Kırıkkale
+962,İZMİR DGKÇ,match,gem,L100000405909,false,"Enka İzmir DGKÇ (1580 MW, Aliağa)"
+966,RWE DENİZLİ DGKÇ,match,gem,L100000405929,false,Turcas Denizli = RWE-Turcas Denizli DGKÇ (797 MW); ad yalnız il adında ortak
+968,LODOS RES,no_match,,,false,GEM/OSM'de Lodos RES kaydı yok
+1176,MERSİN RES,match,gem,L100000921633,false,"GEM 'Mersin Mut wind farm' (Mut Ağaoğlu, 99,9 MW); EPİAŞ MUT RES ayrı santral"
+1241,İSDEMİR,no_match,,,false,İskenderun Demir Çelik için GEM/OSM kaydı yok
+1257,ENTEK KÖSEKÖY,match,gem,L100000405920,false,AES Entek Köseköy = İzmit-Köseköy santrali (112 MW)
+1436,PİRİNÇLİ HES,no_match,,,false,Bilinen yanlış pozitif: aday 'Pirinçlik HES' ayrı EPİAŞ santrali PİRİNÇLİK HES'e ait
+1473,MAREN JES,match,gem,L100001045039,false,"GEM 'Mehmet' kaydının diğer adı 'Maren maraş'; kapasite 24,8 MW < üretim 40 MW"
+1517,BANDIRMA3 RES,match,gem,L100000921472,false,Bilinen yanlış pozitif (Kandıra) düzeltildi: Bandirma-3 wind farm
+1760,SİLİVRİ RES,match,osm,relation/14577635,false,"Ad tam aynı; OSM kapasitesi (63 MW) eski, üretim 113 MW"
+1786,EFE JES,match,gem,L100000700046,false,Gürmat Efe santralleri Germencik; Efeler JES kaydı (161 MW)
+1881,ARDAHAN AKINCI HES,match,gem,L100000603577,false,"Akıncı Çıldır (Kayabeyi barajı, Ardahan); bulanık aday Tokat'taki Akıncı HES'ti (il cezası)"
+1927,KEN KİPAŞ JES,match,gem,L100001045001,false,Maren Ken Kipaş JES; aday çakışma kuralıyla düşmüştü
+1954,KARAKAYA HES TRABZON,no_match,,,false,Bilinen yanlış pozitif: GEM Karakaya Diyarbakır'daki büyük baraj; Trabzon'daki santral için kayıt yok
+2030,KURTKAYASI RES,match,gem,L100000921621,false,"Ad tam aynı; GEM kapasitesi (46 MW) eski, üretim 68 MW"
+2085,AFYON1 BİYOGAZ,match,gem,L100000831205,false,Bilinen yanlış pozitif (Eber) düzeltildi: GEM 'Afyon-1 Biyogaz Santrali solar project' aynı tesis adını taşıyor
+2126,KEN-3 JES,match,gem,L100001045001,false,GEM Ken Kipas kaydının diğer adı 'Maren Ken Kipaş-3'
+2127,MEHMETHAN JES,match,gem,L100001045039,false,GEM 'Mehmet' kaydının diğer adı 'Mehmet Han'; MAREN JES ile aynı kayıt
+2159,AİRRES-4,match,gem,L100000921428,false,"Air Wind Farm 4; GEM kapasitesi (61 MW) eski, üretim 132 MW"
+2170,KIRIKKALE DGKÇ,match,gem,L100000405932,false,Yahşihan = ACWA Power Kırıkkale DGKÇ (927 MW)
+2216,EFE6 JES,match,gem,L100000700046,false,Gürmat Efe santralleri Germencik; Efeler JES kaydı
+2233,ITC ANTALYA BİYOKÜTLE,match,gem,L100001048319,false,"GEM Antalya biyokütle santrali (28,3 MW; EPİAŞ max 28 MW)"
+2335,EFE7 JES,match,gem,L100000700046,false,Gürmat Efe santralleri Germencik; Efeler JES kaydı
+2421,TÜPRAŞ İZMİR,match,gem,L100001077551,true,Tesis kaydı yok; aynı sahadaki 'Aliaga Rafinerisi Santrali solar project' kaydı konum vekili
+2448,HASANOBA RES,match,gem,L100000921566,false,"Ad tam aynı; GEM kapasitesi (51 MW) eski, üretim 75 MW"
+2479,GÜLPINAR RES,no_match,,,false,Gülpınar RES kaydı yok; aday Gülpir (34 MW) kapasiteyle uyumsuz
+2579,KARAPINAR YEKA-1 GES,match,gem,L100000831378,false,Karapınar YEKA GES sahası (1350 MW); MEKE GES ile aynı saha
+2588,EVRENCİK RES,match,gem,L100000921528,false,"Ad tam aynı; GEM kapasitesi (120 MW) eski, üretim 170 MW"
+2711,SOĞANLI RES,match,osm,relation/17564704,false,"Ad tam aynı; OSM kapasitesi (61,5 MW) eski, üretim 99 MW"
+2714,EFE8 JES,match,gem,L100000700046,false,Gürmat Efe santralleri Germencik; Efeler JES kaydı
+2772,NEZİHE BEREN JES,match,gem,L100001026020,false,Maren Nezihe Beren JES
+2784,İSTAÇ BES,match,osm,relation/20385825,false,İSTAÇ Odayeri atık tesisi (OSM 78 MW; EPİAŞ max 75 MW); Kemerburgaz yakma tesisi de 1-2 km yakında
+2798,KARAPINAR YEKA-1 MEKE GES,match,gem,L100000831378,false,Karapınar YEKA GES sahası (1350 MW); üç EPİAŞ santrali aynı sahada
+2960,ETİ BAKIR MAZIDAĞI TES,no_match,,,false,"Tesis kaydı yok; 'Eti Bakır 2 GES' Mazıdağı'na ~14 km, vekil olarak kullanılmadı"
+2995,ERCİYES RES,no_match,,,false,GEM/OSM'de kayıt yok
+3132,UYGAR RES,match,gem,L100000921721,false,"Ad tam aynı; GEM kapasitesi (163 MW) eski, üretim 248 MW"
+3156,R3-MALATYA-1 RES,no_match,,,false,GEM/OSM'de kayıt yok
+3158,PELİT RES,no_match,,,false,GEM/OSM'de kayıt yok; aday Cerit yanlış
+3180,KESTANEDERESİ RES,no_match,,,false,GEM/OSM'de kayıt yok
+3198,ELMACIK RES,no_match,,,false,GEM/OSM'de kayıt yok
+3214,G24-KARAPINAR GES,match,gem,L100000831378,false,Karapınar YEKA GES sahası (1350 MW); üç EPİAŞ santrali aynı sahada

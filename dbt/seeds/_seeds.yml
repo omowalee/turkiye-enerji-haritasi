@@ -157,6 +157,7 @@ seeds:
         action: string
         location_source: string
         location_id: string
+        is_location_proxy: boolean
         note: string
     columns:
       - name: plant_id
@@ -187,5 +188,10 @@ seeds:
         description: >
           stg_plant_locations.location_id (yalnızca action = 'match'). Varlığı
           assert_override_locations_exist testiyle denetlenir.
+      - name: is_location_proxy
+        description: >
+          true: konum kaydı santralin kendisi değil, aynı sahadaki başka bir tesis (vekil). Koordinat
+          kullanılır, kaydın kurulu gücü santrali temsil etmez (dim_plants'ta installed_capacity_mw NULL).
+        data_tests: [not_null]
       - name: note
         description: Gerekçe (kısa, Türkçe).

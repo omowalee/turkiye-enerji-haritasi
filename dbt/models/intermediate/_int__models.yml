@@ -97,6 +97,11 @@ models:
               arguments:
                 min_value: 0
                 max_value: 1
+      - name: is_location_proxy
+        description: >
+          Konum kaydı santralin kendisi değil, aynı sahadaki başka bir tesis (elle düzeltme seed'indeki
+          is_location_proxy). Koordinat geçerli, kurulu güç santrali temsil etmez.
+        data_tests: [not_null]
       - name: is_located
         description: Koordinatı var mı (latitude NOT NULL).
         data_tests: [not_null]
