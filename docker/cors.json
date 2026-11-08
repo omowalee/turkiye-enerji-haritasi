@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["https://KULLANICI.github.io"],
+    "origin": ["https://omowalee.github.io"],
     "method": ["GET", "HEAD"],
     "responseHeader": ["Content-Type", "Content-Encoding"],
     "maxAgeSeconds": 3600

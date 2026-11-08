@@ -45,6 +45,6 @@ Yerel doğrulama (Docker'sız): `.venv/Scripts/python -X utf8 -m scripts.check`.
 
 ## Yayın (GitHub Pages)
 
-`.github/workflows/pages.yml`, `main`/`master`'a her push'ta `frontend/`'i derler (`VITE_DATA_BASE_URL` = repo değişkeni `DATA_BASE_URL`, GCS kovasının genel adresi) ve Pages'e yükler. Kovanın CORS ayarı için şablon: `docker/cors.json` (`KULLANICI` yerine GitHub kullanıcı adı).
+`.github/workflows/pages.yml`, `main`/`master`'a her push'ta `frontend/`'i derler (`VITE_DATA_BASE_URL` = repo değişkeni `DATA_BASE_URL`, GCS kovasının genel adresi) ve Pages'e yükler. Kovanın CORS ayarı: `docker/cors.json` (`gcloud storage buckets update gs://<kova> --cors-file=docker/cors.json`).
 
-Not: proje sayfası (`https://KULLANICI.github.io/<repo>/`) olarak yayınlanacaksa Vite `base` ayarının repo yoluna (`/<repo>/`) ayarlanması gerekir. Bu, `frontend/vite.config.ts` içinde yapılacak bir frontend değişikliğidir (Antigravity).
+Site proje sayfası olarak yayınlanır (`https://omowalee.github.io/<repo>/`). İş akışı `VITE_BASE_PATH=/<repo>/` verir; `frontend/vite.config.ts` bunu `base` olarak kullanır, yerelde `/` kalır.
