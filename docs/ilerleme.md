@@ -49,12 +49,15 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 - Son güncelleme: 2026-11-08 (commit'leri Claude Code attı)
 - Yapılanlar:
   - `frontend/docs/tasarim-onerisi.md` (fda748b): koyu palet, 11 kaynak rengi, Space Grotesk / Inter / JetBrains Mono, masaüstü ve mobil yerleşim, mod ayrımı, durumlar.
-  - Panel iskeleti (d90d602), **tasarım onayından önce yazıldı** (prompt "kod yazma" diyordu): Vite + React 19 + TS strict, Tailwind v4, deck.gl (altlık haritasız, il poligonları üzerinde), canlı sayaçlar, santral noktaları, "Santral verisi" rozeti, lisanssız güneş notu, atıflar. Notlar: `frontend/docs/notlar.md`.
+  - Panel iskeleti (d90d602; kullanıcı Antigravity'ye ayrıca kodlama prompt'u vermişti): Vite + React 19 + TS strict, Tailwind v4, deck.gl (altlık haritasız, il poligonları üzerinde), canlı sayaçlar, santral noktaları, "Santral verisi" rozeti, lisanssız güneş notu, atıflar. Notlar: `frontend/docs/notlar.md`.
 - Doğrulama (typecheck/build): `scripts.check --skip-export`: hepsi geçti (şema, tip senkronu, typecheck, build). Değişiklikler yalnızca `frontend/` içinde.
+  - Tasarım onaylandı (2026-11-08). Linyit rengi `#A8A29E` (zeminde 7,9:1).
+  - 3D sütunlar (b6f023f): ColumnLayer, karekök yükseklik ölçeği, masaüstünde 45° / mobilde 2D, 2D/3D düğmesi, tıklama kartı, seçili saat `App.tsx` içinde tek state'te.
+  - Bağlam katmanı varlığı (f3e5704, Claude Code): `public/geo/neighbors.geojson` (Natural Earth 1:50m, 31 komşu, 28 KB). Antigravity tarafında bağlanması bekleniyor.
 - Açık sorular:
-  - Tasarım onayı kullanıcıda. Reddedilirse iskelet `git revert d90d602` ile geri alınır.
-  - Spec'teki MapLibre koyu altlık harita yok. Harita yalnızca il poligonlarıyla çiziliyor.
-- Sıradaki: Tasarım onayından sonra 3D sütunlar (sonra oynatma → grafik → il paneli → mobil).
+  - Harici tile servisi yok (karar). Bağlam Natural Earth'ten.
+  - Linyit (`#A8A29E`) ile diğer (`#D4A373`) arasında parlaklık farkı yok (1,12:1). Renk körlüğünde karışabilir.
+- Sıradaki: bağlam katmanı (Türkiye parlak, komşular sönük) → 24 saatlik oynatma (iki mod) → kaynak grafiği → il paneli → mobil.
 
 ## Sözleşme istekleri
 
@@ -68,3 +71,4 @@ Frontend'in ihtiyaç duyduğu yeni alanlar buraya yazılır. Veri tarafı şemay
 | Tarih | Yön | Doğrulama sonucu |
 |---|---|---|
 | 2026-11-08 | frontend: tasarım önerisi + iskelet (fda748b, d90d602) | scripts.check: hepsi geçti |
+| 2026-11-08 | frontend: 3D sütunlar (b6f023f) | scripts.check: hepsi geçti |
