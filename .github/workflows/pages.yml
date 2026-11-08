@@ -1,8 +1,10 @@
 name: Pages
 
+# Şimdilik yalnızca elle çalışır (Actions → Pages → Run workflow).
+# Her push'ta yayın için şunu geri ekle:
+#   push:
+#     branches: [main, master]
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:
