@@ -18,6 +18,8 @@ vars:
   lookback_hours: 48
   # Max share of national generation from unmatched plants (decision: 0.15 first, 0.10 after manual overrides).
   max_unmatched_generation_share: 0.15
+  # Minimum fuzzy score (0-100, scripts/match_plants.py) to accept a plant-location candidate.
+  match_min_score: 90
 
 models:
   energy_map:

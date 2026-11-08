@@ -36,3 +36,67 @@ models:
         description: Pencerenin ilk günü (İstanbul).
       - name: window_end_date_tr
         description: Pencerenin son günü (İstanbul).
+
+  - name: int_plants_matched
+    description: >
+      Grain: bir satır = bir EPİAŞ santrali (plant_id); hiçbir santral atılmaz, eşleşmeyenler
+      is_located = false ile kalır (mart'larda "konum bilinmiyor" olarak sayılır).
+      Öncelik: plant_match_overrides (her zaman kazanır) > plant_match_candidates (score >=
+      var match_min_score) > yok. Koordinat ve kurulu güç seçilen GEM/OSM kaydından gelir.
+      İl: koordinat il poligonunun içindeyse o il; dışındaysa (kıyı) 10 km içindeki en yakın il, yoksa NULL.
+    columns:
+      - name: plant_id
+        description: EPİAŞ santral kimliği.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_epias__power_plants')
+                field: plant_id
+      - name: plant_name
+        description: Temizlenmiş EPİAŞ adı.
+      - name: source_type
+        description: Son 30 tam günde baskın source_type (int_plant_profile). Üretimi yoksa NULL.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['solar', 'wind', 'hydro_dam', 'hydro_river', 'natural_gas', 'imported_coal', 'lignite', 'geothermal', 'biomass', 'nuclear', 'other']
+      - name: plant_family
+        description: Kaba yakıt ailesi (seed source_type_families).
+      - name: location_source
+        description: "Konum kaydının kaynağı: 'gem', 'osm' veya NULL."
+      - name: location_id
+        description: stg_plant_locations.location_id veya NULL.
+      - name: latitude
+        description: Enlem (WGS84), konum kaydından. Eşleşme yoksa NULL.
+      - name: longitude
+        description: Boylam (WGS84), konum kaydından. Eşleşme yoksa NULL.
+      - name: installed_capacity_mw
+        description: >
+          Konum kaydındaki kurulu güç, MW (GEM operating birim toplamı veya OSM etiketi; EPİAŞ değil).
+          NULL olabilir; birden çok santralin paylaştığı konumda toplam tesis gücüdür.
+      - name: plate_code
+        description: İl plaka kodu (nokta-poligon; kıyıda 10 km içindeki en yakın il). Konum yoksa NULL.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_provinces')
+                field: plate_code
+      - name: match_method
+        description: "'override' (elle), 'fuzzy' (aday, eşik üstü) veya 'none'."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['override', 'fuzzy', 'none']
+      - name: match_confidence
+        description: 0-1. override = 1.0, fuzzy = score / 100, none = NULL.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: is_located
+        description: Koordinatı var mı (latitude NOT NULL).
+        data_tests: [not_null]

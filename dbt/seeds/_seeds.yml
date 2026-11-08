@@ -143,3 +143,49 @@ seeds:
           - accepted_values:
               arguments:
                 values: ['exact_name', 'fuzzy_name']
+
+  - name: plant_match_overrides
+    description: >
+      ELLE DÜZELTME, her zaman kazanır. action = 'match': konum yalnızca var olan bir GEM/OSM kaydından
+      (location_source + location_id) gelir, koordinat elle yazılmaz. action = 'no_match': doğru kayıt
+      yok, santral "konum bilinmiyor" kalır (location_* boş). plant_name yalnızca okunabilirlik içindir.
+      Grain: bir satır = bir plant_id.
+    config:
+      column_types:
+        plant_id: int64
+        plant_name: string
+        action: string
+        location_source: string
+        location_id: string
+        note: string
+    columns:
+      - name: plant_id
+        description: EPİAŞ santral kimliği.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_epias__power_plants')
+                field: plant_id
+      - name: plant_name
+        description: Okunabilirlik için EPİAŞ adı (eşleştirmede kullanılmaz).
+      - name: action
+        description: "'match' veya 'no_match'."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['match', 'no_match']
+      - name: location_source
+        description: "'gem' veya 'osm' (yalnızca action = 'match')."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['gem', 'osm']
+      - name: location_id
+        description: >
+          stg_plant_locations.location_id (yalnızca action = 'match'). Varlığı
+          assert_override_locations_exist testiyle denetlenir.
+      - name: note
+        description: Gerekçe (kısa, Türkçe).
