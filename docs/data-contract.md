@@ -99,6 +99,7 @@ Tazelik eşikleri, panelin "veri eski" uyarısı için kullanılır. Hesap `ts` 
 
 - Kaynak bazlı veri: 4 saatte uyarı, 6 saatte hata
 - Santral bazlı veri: 36 saatte uyarı, 48 saatte hata
+- Tüketim verisi (`rt-cons`): 5 saatte uyarı, 7 saatte hata. Kaynak bazlı veriden yaklaşık 1 saat sonra yayımlanır.
 
 ## Dosyalar
 

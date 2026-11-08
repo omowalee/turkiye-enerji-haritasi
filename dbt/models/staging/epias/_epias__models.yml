@@ -132,3 +132,34 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [hour_start_at_utc, source_type]
+
+  - name: stg_epias__consumption
+    description: >
+      Grain: bir satır = bir saat (gerçek zamanlı tüketim, rt-cons, ülke toplamı). Saat BAŞLANGICI.
+      rt-gen'den yaklaşık 1 saat sonra yayımlanır. Tekilleştirme: (date_local, ts) başına en son ingested_at.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC.
+        data_tests: [unique, not_null]
+      - name: date_tr
+        description: İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: consumption_mw
+        description: O saatteki tüketim, MW (= saatlik MWh). EPİAŞ gerçek zamanlı tüketim.
+        data_tests: [not_null]
+
+  - name: stg_epias__net_import
+    description: >
+      Grain: bir satır = bir saat. Ülke dış ticareti, `realtime_generation_source.importExport` kolonundan
+      (generation_by_source unpivot'unda bilerek yok; üretim toplamlarına girmez). İşaret: + = net ithalat,
+      - = net ihracat (EPİAŞ işaretiyle aynı; 2026-08..11 arası hep negatif).
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC.
+        data_tests: [unique, not_null]
+      - name: date_tr
+        description: İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: net_import_mw
+        description: Net ithalat, MW (+ = net ithalat, - = net ihracat).
+        data_tests: [not_null]

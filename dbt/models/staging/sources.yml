@@ -21,6 +21,16 @@ sources:
           freshness:
             warn_after: {count: 36, period: hour}
             error_after: {count: 48, period: hour}
+      - name: realtime_consumption
+        description: >
+          rt-cons: gerçek zamanlı tüketim, saatlik (consumption = saatteki MWh = ortalama MW). Bölümleme:
+          date_local. rt-gen'den yaklaşık 1 saat sonra yayımlandığı için tazelik eşikleri kaynak bazlı
+          üretimden 1 saat geniştir (5 / 7 saat).
+        config:
+          loaded_at_field: ts
+          freshness:
+            warn_after: {count: 5, period: hour}
+            error_after: {count: 7, period: hour}
       - name: market_clearing_price
         description: "mcp: gün öncesi piyasa takas fiyatı (PTF), saatlik. Ertesi günün fiyatı da önceden gelir."
       - name: unlicensed_generation
