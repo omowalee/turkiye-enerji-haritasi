@@ -10,6 +10,7 @@ plant_id,plant_name,action,location_source,location_id,is_location_proxy,note
 1176,MERSİN RES,match,gem,L100000921633,false,"GEM 'Mersin Mut wind farm' (Mut Ağaoğlu, 99,9 MW); EPİAŞ MUT RES ayrı santral"
 1241,İSDEMİR,no_match,,,false,İskenderun Demir Çelik için GEM/OSM kaydı yok
 1257,ENTEK KÖSEKÖY,match,gem,L100000405920,false,AES Entek Köseköy = İzmit-Köseköy santrali (112 MW)
+1386,BATMAN TÜPRAŞ,match,osm,way/974288535,true,"Tesis kaydı yok; aynı sahadaki 'Tüpraş Batman Rafineri GES' kaydı konum vekili (önceden bulanık eşleşme, konum aynı)"
 1436,PİRİNÇLİ HES,no_match,,,false,Bilinen yanlış pozitif: aday 'Pirinçlik HES' ayrı EPİAŞ santrali PİRİNÇLİK HES'e ait
 1473,MAREN JES,match,gem,L100001045039,false,"GEM 'Mehmet' kaydının diğer adı 'Maren maraş'; kapasite 24,8 MW < üretim 40 MW"
 1517,BANDIRMA3 RES,match,gem,L100000921472,false,Bilinen yanlış pozitif (Kandıra) düzeltildi: Bandirma-3 wind farm
