@@ -9,6 +9,7 @@ rapidfuzz
 openpyxl
 shapely
 pytest
+google-cloud-storage==3.1.1
 jsonschema
 dbt-core==1.11.17
 dbt-bigquery==1.12.2
