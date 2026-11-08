@@ -47,7 +47,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 100,
-          "description": "Ad benzerliği puanı."
+          "description": "Eşleşme güveni (0-100): elle düzeltme 100, bulanık eşleşmede ad benzerliği puanı (en az 90), eşleşme yoksa 0."
         }
       }
     },
@@ -105,7 +105,7 @@
             "number",
             "null"
           ],
-          "description": "Kapasite MW (GEM işletmedeki toplam, yoksa OSM, yoksa null)."
+          "description": "Kurulu güç MW, konum kaydından (GEM işletmedeki birimler toplamı ya da OSM). Kayıt birden çok santralce paylaşılıyorsa, vekil kayıtsa ya da güç bilinmiyorsa null (\"bilinmiyor\")."
         },
         "match": {
           "$ref": "#/$defs/PlantMatch"

@@ -9,13 +9,13 @@ Sitenin okuduğu JSON dosyalarının şekli `contracts/*.schema.json` (JSON Sche
 | Dosya | Şema | Ne zaman değişir | Örnek boyut (ham / gzip) |
 |---|---|---|---|
 | `snapshot_latest.json` | `snapshot_latest.schema.json` | saatlik | 0,8 KB / 0,4 KB |
-| `plants.json` | `plants.schema.json` | günlük | 229,6 KB / 28,4 KB |
+| `plants.json` | `plants.schema.json` | günlük | 227,1 KB / 27,3 KB |
 | `generation_24h.json` | `generation_24h.schema.json` | günlük (santral verisi ertesi gün gelir) | 88,9 KB / 20,4 KB |
 | `mix_24h.json` | `mix_24h.schema.json` | saatlik | 4,4 KB / 1,4 KB |
-| `provinces_24h.json` | `provinces_24h.schema.json` | günlük | 20,2 KB / 5,9 KB |
-| `provinces.geojson` | `provinces.schema.json` | statik | 157,2 KB / 45,8 KB |
+| `provinces_24h.json` | `provinces_24h.schema.json` | günlük | 20,3 KB / 6,1 KB |
+| `provinces.geojson` | `provinces.schema.json` | statik | 144,0 KB / 43,1 KB |
 | `source_labels.json` | `source_labels.schema.json` | sözleşmeyle birlikte | 0,7 KB / 0,3 KB |
-| **Toplam** | | | **500 KB / 102 KB** |
+| **Toplam** | | | **486 KB / 99 KB** |
 
 - Ortak tanımlar `contracts/common.schema.json` içindedir.
 - **Tek doğrulama komutu:** `.venv/Scripts/python -X utf8 -m scripts.check` (Git Bash'te `./scripts/check.sh`). Dört adımı sırayla çalıştırır:
@@ -27,11 +27,11 @@ Sitenin okuduğu JSON dosyalarının şekli `contracts/*.schema.json` (JSON Sche
   Bayraklar:
   - `--skip-export`: yalnızca doğrulama yapar.
   - `--root ../a-frontend`: kontrolü worktree'de çalıştırır.
-  - `data/raw/` yoksa dışa aktarma adımı kendiliğinden atlanır.
+  - `.env` (BigQuery kimliği) yoksa dışa aktarma adımı kendiliğinden atlanır.
 - **TypeScript tipleri:** `cd contracts && npm install && npm run gen:types` komutu `frontend/src/types/*.ts` dosyalarını üretir. Bu dosyalar elle düzenlenmez.
-- **Örnek veri:** `.venv/Scripts/python -X utf8 -m scripts.export_sample` komutu BigQuery ham katmanından `frontend/public/data/sample/` klasörünü üretir ve her dosyayı yazmadan önce şemayla doğrular.
+- **Örnek veri:** `.venv/Scripts/python -X utf8 -m scripts.export_sample` komutu dbt mart'larından (BigQuery `epias_marts`: `mart_live_snapshot`, `dim_plants`, `fct_generation_hourly`, `agg_generation_by_source_hourly`, `agg_generation_by_province_hourly`; il sınırları `epias_staging.stg_provinces`) `frontend/public/data/sample/` klasörünü üretir ve her dosyayı yazmadan önce şemayla doğrular.
 - **Yalnızca doğrulama:** `... -m scripts.export_sample --validate-only [--out KLASÖR]`
-- v0 örnekleri **dbt'siz** üretildi. Santral eşleştirmesi keşif prototipinden alındı. Bu yüzden konum kapsamı ve kurulu güç geçicidir. Ayrıntı için aşağıdaki "Bilinen sınırlar" bölümüne bakın.
+- Eşleştirme, il ataması, kurulu güç kuralı ve kesinleşmiş saat kuralı dbt'dedir. Dışa aktarma yalnızca biçimlendirir (yerel dosya ya da bulanık eşleştirme kullanmaz). Bir dışa aktarma yaklaşık 7 MiB tarar.
 
 ## Ortak kurallar
 
@@ -83,7 +83,7 @@ EPİAŞ, ülke verisinin en son saatini önce eksik yayımlar ve sonra tamamlar.
 - **`live.ts`, ülke verisindeki en son saatten bir önceki saattir.** Sayaçlar bu kesinleşmiş saati gösterir. Bunun karşılığında yaklaşık 1 saatlik ek gecikmeyi kabul ediyoruz.
 - `mix_24h.live` serisi de kesinleşmiş saatte biter.
 - En son (ön veri) saat isteğe bağlı `live.provisional` alanında durur: `{ ts, total_mw }`. Panel bu alanı şimdilik kullanmaz. İleride "ön veri" etiketiyle gösterilebilir.
-- Aşama 2'de bu kural dbt'de `mart_live_snapshot` içinde uygulanacak ve testle korunacak.
+- Kural dbt'de `mart_live_snapshot` içinde uygulanır ve `assert_live_hour_is_one_before_latest` testiyle korunur.
 
 Tazelik eşikleri, panelin "veri eski" uyarısı için kullanılır. Hesap `ts` ya da `date` ile o anki saat arasındaki farka göre yapılır:
 
@@ -128,11 +128,12 @@ Santral boyutu, günde bir güncellenir. `plants[]` dizisindeki her eleman:
 | `source` | SourceType | Son 30 günün baskın yakıtı |
 | `lat`, `lon` | number \| null | 4 ondalık. Eşleşmeyen santralde `null` olur |
 | `province` | int \| null | İl plaka kodu (1–81). Koordinattan nokta-poligon yöntemiyle bulunur |
-| `capacity_mw` | number \| null | Kurulu güç (GEM, yoksa OSM). Bilinmiyorsa `null` |
+| `capacity_mw` | number \| null | Kurulu güç, konum kaydından (GEM, yoksa OSM). Kayıt paylaşılıyorsa, vekil kayıtsa ya da güç bilinmiyorsa `null` (aşağıya bakın) |
 | `match.source` | `"gem"` \| `"osm"` \| null | Koordinatın kaynağı |
-| `match.score` | int | Eşleşme güveni (0–100) |
+| `match.score` | int | Eşleşme güveni (0–100): elle düzeltme 100, bulanık eşleşme ad benzerliği (en az 90), eşleşme yoksa 0 |
 
 - Listede son 30 günde üretimi olan santraller yer alır.
+- **Kurulu güç kuralı (kullanıcı kararı, 2026-11-08):** `capacity_mw` yalnızca konum kaydını tek bir santral kullanıyorsa ve kayıt vekil değilse doludur. Birden çok santralin paylaştığı sahalarda (ZETES 1-3, Karapınar YEKA, TUTES-A/B vb.) kaydın gücü tesis toplamıdır ve santrale ait değildir. Vekil kayıtlarda (TÜPRAŞ İZMİT/İZMİR: aynı sahadaki başka bir tesis) güç alakasızdır. Bu durumlarda değer `null` olur ve panelde "bilinmiyor" yazılır.
 - Koordinatı `null` olan santraller haritada gösterilmez. Üretimleri il panelinde `unlocated` olarak görünür.
 - OSM kökenli koordinatlar bu dosyayı ODbL kapsamına sokar. Atıf zorunludur.
 
@@ -191,16 +192,18 @@ Yalnızca üretimi olan iller listededir ve `rank` sırasına dizilidir. Listede
 - 81 ilin sadeleştirilmiş sınırları: FeatureCollection, Polygon ya da MultiPolygon.
 - `properties` alanları: `plate` (int), `name`, `iso` (`TR-01`…).
 - Kaynak geoBoundaries TUR ADM1 (CC BY-SA 2.0). Atıf zorunludur.
-- v0'da shapely ile sadeleştirildi ve 3 ondalığa yuvarlandı. Komşu il sınırlarında küçük boşluklar olabilir.
+- `stg_provinces`'tan BigQuery `ST_SIMPLIFY` (1.000 m) ile sadeleştirilir ve 3 ondalığa yuvarlanır. Sadeleştirmede noktaya inen küçük adalar düşer. İller ayrı ayrı sadeleştirildiği için komşu sınırlarda küçük boşluklar olabilir.
 
-## Bilinen sınırlar (v0)
+## Bilinen sınırlar
 
-1. **Konum kapsamı geçici.**
-   - 1.548 santralden 778'i eşleşti: 606 GEM, 172 OSM.
-   - Bunlar 2026-11-07 üretiminin %82,4'ü. Kalan %17,6 `unlocated` olarak görünür.
-   - Aşama 2'de dbt eşleştirmesi ve elle düzeltme seed'i ile artacak.
-2. **Yanlış pozitif eşleşmeler var.** Örneğin "KARAKAYA HES TRABZON", Diyarbakır'daki Karakaya'ya bağlandı. dbt'de düzeltilecek.
-3. **Kurulu güç eksik.** Eşleşen 42 santralde `capacity_mw` null.
+Sayılar 2026-11-08 örneğinden (santral günü 2026-11-07). Eşleştirme ayrıntısı: `docs/eslestirme-raporu.md`.
+
+1. **Konum kapsamı.**
+   - `plants.json` içindeki 1.548 santralden 758'i konumlu: 488 GEM, 270 OSM.
+   - Son 30 tam günün üretiminde konumlu pay %91,74. 2026-11-07 gününde %89,3, kalan %10,7 `unlocated` olarak görünür.
+   - dbt testi: konumsuz pay %10'u aşarsa uyarı, %15'i aşarsa hata.
+2. **Yanlış pozitifler azaltıldı.** v0'daki "KARAKAYA HES TRABZON" → Diyarbakır gibi eşleşmeler elle düzeltme seed'iyle kaldırıldı. Kalan şüpheli eşleşmeler dbt uyarı testlerinde listelenir.
+3. **Kurulu güç kısmi.** Konumlu 758 santralin 633'ünde `capacity_mw` dolu. 125'inde `null`: paylaşılan sahalar, vekil kayıtlar ve kaydında güç olmayanlar (bkz. "Kurulu güç kuralı").
 4. **Son saat eksik geliyordu: karar verildi.** Bkz. "Kesinleşmiş saat kuralı". `live` bir önceki saati kullanır, eksik saat `live.provisional` alanına gider.
 5. **Gelecekte değişebilecek alanlar:**
    - santral için `province` adı (şimdilik yalnızca plaka kodu var)
@@ -211,4 +214,5 @@ Yalnızca üretimi olan iller listededir ve `rank` sırasına dizilidir. Listede
 
 | Sürüm | Tarih | Değişiklik |
 |---|---|---|
+| 0.1 | 2026-11-08 | Örnek veri dbt mart'larından üretiliyor (şekil değişmedi, sürüm aynı). Değer anlamı: `capacity_mw` kurulu güç kuralı, `match.score` güven puanı (eşleşmeyende 0), dbt eşleştirmesi. `plants.schema.json` içinde bu iki alanın açıklaması güncellendi (yalnızca açıklama). `provinces.geojson` BigQuery'de sadeleştiriliyor |
 | 0.1 | 2026-11-08 | İlk taslak (v0), dbt'siz örnek veri. Aynı gün revize edildi: İngilizce kaynak anahtarları ve `source_labels.json`, `schema_version` "0.1", kesinleşmiş saat kuralı ve `live.provisional`, tek doğrulama komutu `scripts.check` |

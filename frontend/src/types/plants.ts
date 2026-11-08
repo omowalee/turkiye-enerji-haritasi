@@ -44,7 +44,7 @@ export interface Plant {
    */
   province: number | null;
   /**
-   * Kapasite MW (GEM işletmedeki toplam, yoksa OSM, yoksa null).
+   * Kurulu güç MW, konum kaydından (GEM işletmedeki birimler toplamı ya da OSM). Kayıt birden çok santralce paylaşılıyorsa, vekil kayıtsa ya da güç bilinmiyorsa null ("bilinmiyor").
    */
   capacity_mw: number | null;
   match: PlantMatch;
@@ -55,7 +55,7 @@ export interface PlantMatch {
    */
   source: "gem" | "osm" | null;
   /**
-   * Ad benzerliği puanı.
+   * Eşleşme güveni (0-100): elle düzeltme 100, bulanık eşleşmede ad benzerliği puanı (en az 90), eşleşme yoksa 0.
    */
   score: number;
 }
