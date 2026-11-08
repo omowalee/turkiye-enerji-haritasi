@@ -41,7 +41,7 @@ Sürüm planı ve aşamalar: `prompt-surum1.md`. Güncel durum: `docs/ilerleme.m
 - **Akkuyu eşdeğeri** = kaynak üretimi (MW) / 1200. Veride nükleer kolonu yoksa panel hata vermez.
 - **Kaynak renkleri:** güneş sarı, rüzgâr camgöbeği, hidro mavi, doğalgaz turuncu, kömür gri, nükleer mor. Diğerleri bu palete uyumlu seçilir.
 - **Arayüz Türkçe.** Sayılar Türkçe biçimde yazılır: binlik ayracı nokta, ondalık virgül.
-- **Atıflar** (README ve panelin altında): EPİAŞ Şeffaflık Platformu, Global Energy Monitor, © OpenStreetMap katkıcıları, geoBoundaries.
+- **Atıflar** (README ve panelin altında): EPİAŞ Şeffaflık Platformu, Global Energy Monitor, © OpenStreetMap katkıcıları, geoBoundaries, Natural Earth.
 
 ## Güvenlik
 
