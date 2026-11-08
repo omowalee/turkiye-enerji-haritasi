@@ -78,3 +78,45 @@ models:
               arguments:
                 min_value: 0
                 inclusive: false
+
+  - name: fct_generation_hourly
+    description: >
+      Grain: bir satır = bir saat x bir santral (plant_id). Lisanslı üretim (rt-gen-bulk), santralin bütün
+      yakıtlarının toplamı; sıfır üretimli santral-saatler yoktur. Artımlı (merge), her çalışmada son
+      var('lookback_hours') saat yeniden işlenir. Bölüm: hour_start_at_utc (gün, UTC); yerel güne göre
+      okurken bölüm budaması için hour_start_at_utc aralığı da verilmeli. Kaynak bazlı ayrım ve il için
+      agg_generation_by_province_hourly; santral nitelikleri için dim_plants.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC (TIMESTAMP). Bölüm kolonu.
+        data_tests: [not_null]
+      - name: hour_start_tr
+        description: Saatin BAŞLANGICI, İstanbul yerel saati (DATETIME, +03:00).
+        data_tests: [not_null]
+      - name: date_tr
+        description: Saatin İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: plant_id
+        description: EPİAŞ santral kimliği.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_plants')
+                field: plant_id
+      - name: source_type
+        description: >
+          Santralin O SAATTEKİ baskın yakıtı (en çok MW; eşitlikte source_types sırası). Saatten
+          bağımsız 30 günlük baskın kaynak dim_plants.source_type'tadır.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['solar', 'wind', 'hydro_dam', 'hydro_river', 'natural_gas', 'imported_coal', 'lignite', 'geothermal', 'biomass', 'nuclear', 'other']
+      - name: generation_mw
+        description: O saatteki ortalama güç, MW (= saatlik MWh), santralin bütün yakıtları toplamı. Negatif olabilir (iç tüketim).
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [hour_start_at_utc, plant_id]
