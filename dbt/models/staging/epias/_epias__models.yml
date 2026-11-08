@@ -1,0 +1,134 @@
+version: 2
+
+models:
+  - name: stg_epias__generation_by_source
+    description: >
+      Grain: bir satır = bir saat x bir source_type (ülke toplamı, lisanslı, dış ticaret hariç).
+      Ham `realtime_generation_source` tablosundan; EPİAŞ yakıt kolonları dinamik olarak
+      unpivot edilir ve `epias_fuel_map` seed'i ile source_type'a eşlenir. Eşlenmeyen yeni
+      sayısal kolon adı nucl/nukleer içeriyorsa `nuclear`, değilse `other` olur (bkz.
+      `warn_unmapped_epias_columns` testi). `importExport` ve `total` dışarıda bırakılır.
+      Not: Prompt tek bir `stg_epias__realtime_generation` öneriyordu; iki ham tablonun grain'i
+      farklı olduğu (ülke saat x kaynak, santral saat x santral) için tablo başına ayrı staging
+      modeli yazıldı. Ham satırlar ts başına en son ingested_at ile tekilleştirilir.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC (TIMESTAMP). İstanbul'da +3 saat.
+        data_tests: [not_null]
+      - name: date_tr
+        description: Saatin İstanbul yerel günü (ham date_local).
+        data_tests: [not_null]
+      - name: source_type
+        description: Kontrollü kaynak türü sözlüğü (seed source_types).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('source_types')
+                field: source_type
+      - name: generation_mw
+        description: O saatteki ortalama güç, MW (= saatlik MWh). Lisanslı üretim, dış ticaret hariç.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [hour_start_at_utc, source_type]
+
+  - name: stg_epias__generation_by_plant
+    description: >
+      Grain: bir satır = bir saat x bir santral (plant_id) x bir source_type (lisanslı).
+      Ham `realtime_generation_plant` tablosundan; yakıt kolonları source_type'a eşlenir
+      (aynı source_type'a giden kolonlar toplanır, örn. naturalGas + lng). Üretimi 0 veya NULL
+      olan satırlar atılır (boyutu küçük tutmak için; toplamlara etkisi yoktur).
+      Tekilleştirme: (ts, pp_id) başına en son ingested_at.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC (TIMESTAMP).
+        data_tests: [not_null]
+      - name: date_tr
+        description: Saatin İstanbul yerel günü (ham date_local).
+        data_tests: [not_null]
+      - name: plant_id
+        description: EPİAŞ santral kimliği (pp_id), INT64.
+        data_tests: [not_null]
+      - name: plant_name_raw
+        description: Ham `powerPlantName` ("AD-EIC-ID" biçimi). Temizlenmiş ad için stg_epias__power_plants.
+      - name: source_type
+        description: Kontrollü kaynak türü sözlüğü.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('source_types')
+                field: source_type
+      - name: generation_mw
+        description: O saatteki ortalama güç, MW (= saatlik MWh), sıfırdan farklı.
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [hour_start_at_utc, plant_id, source_type]
+
+  - name: stg_epias__power_plants
+    description: >
+      Grain: bir satır = bir EPİAŞ santrali (plant_id), `power_plants` tablosunun EN SON
+      snapshot_date'inden. Koordinat, il ve kurulu güç içermez.
+    columns:
+      - name: plant_id
+        description: EPİAŞ santral kimliği (pp_id).
+        data_tests: [unique, not_null]
+      - name: plant_name
+        description: Temizlenmiş ad (EIC eki "-40W..." ve sondaki "-<id>" atılmış, trim). Eşleştirme girdisi.
+        data_tests: [not_null]
+      - name: plant_name_raw
+        description: Ham ad.
+      - name: eic
+        description: EIC kodu (kolondan, yoksa addan ayrıştırılır). Bazı santrallerde NULL.
+      - name: short_name
+        description: EPİAŞ kısa adı.
+      - name: snapshot_date
+        description: Listenin alındığı gün.
+
+  - name: stg_epias__market_clearing_price
+    description: >
+      Grain: bir satır = bir saat (gün öncesi piyasa takas fiyatı, PTF). Ertesi günün fiyatı
+      önceden yayımlanır. Saat BAŞLANGICI.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC.
+        data_tests: [unique, not_null]
+      - name: date_tr
+        description: İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: price_try_per_mwh
+        description: PTF, TL/MWh.
+      - name: price_usd_per_mwh
+        description: PTF, USD/MWh.
+      - name: price_eur_per_mwh
+        description: PTF, EUR/MWh.
+
+  - name: stg_epias__unlicensed_generation
+    description: >
+      Grain: bir satır = bir saat x bir source_type (lisanssız üretim, ülke toplamı). Aylık
+      yayımlanır (5-6 hafta gecikme); santral bazlı değildir. gunes→solar, ruzgar→wind,
+      biyokutle+biyogaz→biomass, kanalTipi→hydro_river, diger→other; toplam atılır.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC.
+        data_tests: [not_null]
+      - name: date_tr
+        description: İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: source_type
+        description: Kontrollü kaynak türü.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('source_types')
+                field: source_type
+      - name: generation_mw
+        description: Ortalama güç, MW. Lisanslı üretimle toplanmaz.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [hour_start_at_utc, source_type]
