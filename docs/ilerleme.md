@@ -13,23 +13,20 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 
 - Son güncelleme: 2026-11-08 (Aşama 1 bitti)
 - Yapılanlar:
-  - `pipeline/epias/extract.py`: 5 EPİAŞ servisi (santral listesi, santral bazlı üretim, kaynak bazlı üretim, PTF, lisanssız üretim).
-  - `pipeline/bq` ve `pipeline/jobs`: `epias_raw` tablolarına idempotent yükleme. Tablolar İstanbul yerel tarihine göre (`date_local`) bölümlü, her gün tek seferde yeniden yazılıyor.
-  - `geo_raw` dataset'i: GEM 4.131, OSM 1.796, il sınırları 81 satır.
-  - Komutlar: saatlik iş `python -m pipeline.jobs.ingest`, geçmiş yükleme `python -m pipeline.jobs.backfill --days 90`, referans verisi `python -m pipeline.jobs.load_reference`.
-- Doğrulama:
-  - 90 gün (10.08–07.11): `sql/eksik_saatler.sql` 0 eksik saat döndürdü. Santral tablosu 3.676.102 satır, 0 kopya.
-  - Santral toplamı = ülke toplamı (dış ticaret hariç).
-  - pytest: 25/25 geçiyor.
-- Kararlar:
-  - Seçenek 1, iki mod: sayaçlar ve kaynak dağılımı canlı (~1 saat gecikme). Harita ve 24 saatlik oynatma en son tam günün santral verisini gösterir, tarih açıkça yazılır.
-  - Santral verisi (`rt-gen-bulk`) en erken ertesi gün geliyor (EPİAŞ hata kodu SEF1149). Saatlik iş santral verisini sadece dün için çekiyor.
-  - Tazelik testleri: santral verisi 36 saatte uyarı, 48 saatte hata. Kaynak bazlı veri 3 saatte uyarı, 6 saatte hata.
+  - `pipeline/epias`: 5 EPİAŞ servisi. `pipeline/bq` ve `jobs`: `epias_raw` tablolarına `date_local` bölümlü idempotent yükleme.
+  - `geo_raw`: GEM 4.131, OSM 1.796, il sınırları 81 satır.
+  - Komutlar: `python -m pipeline.jobs.ingest` (saatlik), `backfill --days 90`, `load_reference`.
+- Doğrulama: 90 gün (10.08–07.11) için `sql/eksik_saatler.sql` 0 eksik saat döndürdü. Santral tablosu 3.676.102 satır, 0 kopya. Santral toplamı = ülke toplamı (dış ticaret hariç). pytest 25/25.
+- Kararlar (ayrıntı: AGENTS.md, docs/kararlar.md):
+  - Santral verisi en erken ertesi gün geliyor (SEF1149). Saatlik iş santral verisini yalnızca dün için çekiyor.
+  - İki mod: canlı modda sayaçlar ve grafik bugünü gösterir, harita en son tam günde durur. Oynatma modunda hepsi en son tam güne geçer.
+  - Tazelik eşikleri: santral verisi 36 saatte uyarı, 48 saatte hata. Kaynak bazlı veri 3 saatte uyarı, 6 saatte hata.
+  - Lisanssız üretim: yalnızca lisanslı üretim gösterilir, "lisanslı üretim" etiketi ve gecikme etiketli lisanssız güneş notu eklenir. Tahmin Sürüm 2'de.
 - Açık sorular:
-  - Git commit henüz atılmadı.
   - eptr2 hata türlerini ayırmıyor, tekrar deneme kararı mesaj metnine bakıyor (kırılgan).
-  - Ham tablolarda tüm kolonlar NULL olabiliyor, `not_null` kontrolü dbt testlerinde yapılmalı.
-- Sıradaki: Aşama 2 (dbt). İlk adım `int_plants_matched` ve en büyük 200 santral için `seeds/plant_match_overrides.csv`. `mart_live_snapshot` iki parçaya ayrılacak: canlı ülke verisi ve son tam günün santral verisi.
+  - Ham kolonlar NULL olabiliyor, `not_null` kontrolü dbt testlerinde yapılacak.
+  - BASLANGIC.md commit edilmedi.
+- Sıradaki: Sözleşme v0, sonra Aşama 2 (dbt).
 
 ## Frontend (Antigravity)
 
