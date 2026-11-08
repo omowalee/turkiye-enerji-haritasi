@@ -22,6 +22,10 @@ TABLES = {
         [SF("ts", "TIMESTAMP"), SF("date_local", "DATE"),
          SF("ingested_at", "TIMESTAMP")],
         "date_local", bigquery.TimePartitioningType.DAY, None),
+    "realtime_consumption": (
+        [SF("ts", "TIMESTAMP"), SF("date_local", "DATE"),
+         SF("consumption", "FLOAT64"), SF("ingested_at", "TIMESTAMP")],
+        "date_local", bigquery.TimePartitioningType.DAY, None),
     "market_clearing_price": (
         [SF("ts", "TIMESTAMP"), SF("date_local", "DATE"),
          SF("price", "FLOAT64"), SF("priceUsd", "FLOAT64"), SF("priceEur", "FLOAT64"),

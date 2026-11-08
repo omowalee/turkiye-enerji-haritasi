@@ -138,6 +138,16 @@ def fetch_generation_by_plant(day: dt.date, pp_ids: list[int] | None = None) -> 
     return out.reset_index(drop=True)
 
 
+def fetch_consumption(day: dt.date) -> pd.DataFrame:
+    """Gerçek zamanlı tüketim (rt-cons): `consumption` (MWh/saat); `day` İstanbul yerel günü."""
+    df = _call("rt-cons", start_date=_iso(day), end_date=_iso(day))
+    if df.empty:
+        return _empty({"ts": _TS_DTYPE})
+    out = _with_ts(df)
+    _check_unique(out, ["ts"], "rt-cons")
+    return out.reset_index(drop=True)
+
+
 def fetch_mcp(day: dt.date) -> pd.DataFrame:
     """Piyasa takas fiyatı (PTF): price, priceUsd, priceEur."""
     df = _call("mcp", start_date=_iso(day), end_date=_iso(day))

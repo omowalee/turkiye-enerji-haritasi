@@ -193,3 +193,23 @@ def test_persistent_failure_gives_up_after_5(fake):
     with pytest.raises(TimeoutError):
         extract.fetch_mcp(DAY)
     assert n["i"] == 5
+
+
+def test_consumption(fake):
+    client = fake({"rt-cons": load("rt_cons")})
+    df = extract.fetch_consumption(DAY)
+    assert list(df.columns) == ["ts", "consumption"]
+    assert str(df["ts"].dtype) == "datetime64[ns, UTC]"
+    assert df["ts"].iloc[0] == pd.Timestamp("2026-11-06T21:00:00Z")
+    assert df["ts"].iloc[1] == pd.Timestamp("2026-11-06T22:00:00Z")
+    assert str(df["consumption"].dtype) == "float64"
+    assert client.calls[0] == ("rt-cons", {"start_date": "2026-11-06", "end_date": "2026-11-06"})
+
+
+def test_consumption_empty_and_duplicates(fake):
+    fake({"rt-cons": pd.DataFrame()})
+    assert list(extract.fetch_consumption(DAY).columns) == ["ts"]
+    raw = load("rt_cons")
+    fake({"rt-cons": pd.concat([raw, raw.head(1)], ignore_index=True)})
+    with pytest.raises(extract.DuplicateKeyError):
+        extract.fetch_consumption(DAY)

@@ -1,6 +1,6 @@
 """EPİAŞ -> BigQuery raw. Kullanım: python -m pipeline.jobs.ingest [--date YYYY-MM-DD]
 
-Varsayılan: bugün ve dün (yerel) için kaynak ve PTF, yalnızca dün için santral
+Varsayılan: bugün ve dün (yerel) için kaynak, tüketim ve PTF, yalnızca dün için santral
 (EPİAŞ santral verisini ertesi gün yayımlıyor); santral listesi günde bir kez;
 lisanssız üretim son 3 ay.
 """
@@ -22,6 +22,7 @@ log = logging.getLogger("ingest")
 DAILY = {
     "realtime_generation_plant": "fetch_generation_by_plant",
     "realtime_generation_source": "fetch_generation_by_source",
+    "realtime_consumption": "fetch_consumption",
     "market_clearing_price": "fetch_mcp",
 }
 
