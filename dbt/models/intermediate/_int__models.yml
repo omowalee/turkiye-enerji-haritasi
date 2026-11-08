@@ -100,3 +100,46 @@ models:
       - name: is_located
         description: Koordinatı var mı (latitude NOT NULL).
         data_tests: [not_null]
+
+  - name: int_generation_enriched
+    description: >
+      Grain: bir satır = bir saat x bir santral (plant_id) x bir source_type (lisanslı, sıfırdan farklı üretim).
+      stg_epias__generation_by_plant + int_plants_matched (il, koordinat, is_located). Hiçbir üretim satırı
+      atılmaz; santral listesinde olmayan ya da eşleşmeyen santral is_located = false, plate_code NULL kalır.
+      View: date_tr filtresi ham tablonun bölümlerine iner, tüketiciler date_tr ile filtreler.
+      Testler son 7 günle sınırlı (view tüm geçmişte ~0,7 GB tarar).
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC.
+        data_tests:
+          - not_null:
+              config: {where: "date_tr >= date_sub(current_date('Europe/Istanbul'), interval 7 day)"}
+      - name: date_tr
+        description: Saatin İstanbul yerel günü.
+      - name: plant_id
+        description: EPİAŞ santral kimliği.
+        data_tests:
+          - not_null:
+              config: {where: "date_tr >= date_sub(current_date('Europe/Istanbul'), interval 7 day)"}
+      - name: source_type
+        description: Kontrollü kaynak türü (bu satırın yakıtı).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['solar', 'wind', 'hydro_dam', 'hydro_river', 'natural_gas', 'imported_coal', 'lignite', 'geothermal', 'biomass', 'nuclear', 'other']
+              config: {where: "date_tr >= date_sub(current_date('Europe/Istanbul'), interval 7 day)"}
+      - name: generation_mw
+        description: O saatteki ortalama güç, MW (= saatlik MWh), lisanslı.
+      - name: plate_code
+        description: Santralin il plaka kodu (int_plants_matched). Konum ya da il yoksa NULL.
+      - name: latitude
+        description: Enlem (WGS84) veya NULL.
+      - name: longitude
+        description: Boylam (WGS84) veya NULL.
+      - name: is_located
+        description: Santralin koordinatı var mı. Eşleşmeyen ya da listede olmayan santralde false.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [hour_start_at_utc, plant_id, source_type]
+          config: {where: "date_tr >= date_sub(current_date('Europe/Istanbul'), interval 7 day)"}
