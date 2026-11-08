@@ -20,6 +20,8 @@ vars:
   # User decision 2026-11-08: warn above 10 %, error above 15 % (assert_unmatched_generation_share).
   unmatched_share_warn: 0.10
   unmatched_share_error: 0.15
+  # Plant day (single day): warn-only check, daily share swings with wind (user decision 2026-11-08).
+  unmatched_share_daily_warn: 0.15
   # Minimum fuzzy score (0-100, scripts/match_plants.py) to accept a plant-location candidate.
   match_min_score: 90
 
