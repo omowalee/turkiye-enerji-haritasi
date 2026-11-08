@@ -57,7 +57,9 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
 - Açık sorular:
   - Harici tile servisi yok (karar). Bağlam Natural Earth'ten.
   - Linyit (`#A8A29E`) ile diğer (`#D4A373`) arasında parlaklık farkı yok (1,12:1). Renk körlüğünde karışabilir.
-- Sıradaki: bağlam katmanı (Türkiye parlak, komşular sönük) → 24 saatlik oynatma (iki mod) → kaynak grafiği → il paneli → mobil.
+  - İki modlu oynatma: Canlı / Oynatma seçici, zaman çubuğu (oynat/duraklat, hız, imleç), yuvarlanan sayaçlar. Commit'i aşağıdaki birleştirme günlüğünde.
+  - **Geri dönüş noktası:** git tag `gorsel-v1-kontrol-odasi`. Görsel yön bundan sonra baştan değişecek.
+- Sıradaki: yeni görsel yön (prompt'u kullanıcı veriyor) → kaynak grafiği → il paneli → mobil.
 
 ## Sözleşme istekleri
 
@@ -72,3 +74,4 @@ Frontend'in ihtiyaç duyduğu yeni alanlar buraya yazılır. Veri tarafı şemay
 |---|---|---|
 | 2026-11-08 | frontend: tasarım önerisi + iskelet (fda748b, d90d602) | scripts.check: hepsi geçti |
 | 2026-11-08 | frontend: 3D sütunlar (b6f023f) | scripts.check: hepsi geçti |
+| 2026-11-08 | frontend: iki modlu oynatma (tag gorsel-v1-kontrol-odasi) | scripts.check: hepsi geçti |
