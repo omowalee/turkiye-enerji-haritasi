@@ -1,0 +1,12 @@
+source_type,plant_family
+solar,solar
+wind,wind
+hydro_dam,hydro
+hydro_river,hydro
+geothermal,geothermal
+biomass,bio
+natural_gas,gas
+imported_coal,coal
+lignite,coal
+nuclear,other
+other,other

@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: int_plant_profile
+    description: >
+      Grain: bir satır = bir EPİAŞ santrali (plant_id). stg_epias__power_plants'taki her santral
+      yer alır (üretimi yoksa 0 MWh). Pencere: santral verisinde 24 saati tam olan en son 30 gün
+      (date_tr). Eşleştirme (scripts/match_plants.py) ve eşleşmeyen üretim payı testi bu modeli okur.
+    columns:
+      - name: plant_id
+        description: EPİAŞ santral kimliği.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_epias__power_plants')
+                field: plant_id
+      - name: plant_name
+        description: Temizlenmiş EPİAŞ adı.
+      - name: source_type
+        description: Pencerede en çok MWh üreten source_type (baskın kaynak). Üretimi yoksa NULL.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['solar', 'wind', 'hydro_dam', 'hydro_river', 'natural_gas', 'imported_coal', 'lignite', 'geothermal', 'biomass', 'nuclear', 'other']
+      - name: plant_family
+        description: Baskın source_type'ın ailesi (seed source_type_families). Üretimi yoksa NULL.
+      - name: total_mwh_30d
+        description: Pencere toplam üretimi, MWh (lisanslı).
+        data_tests: [not_null]
+      - name: max_hourly_mw_30d
+        description: Penceredeki en yüksek saatlik üretim, MW (santralin tüm kaynakları toplamı).
+        data_tests: [not_null]
+      - name: window_start_date_tr
+        description: Pencerenin ilk günü (İstanbul).
+      - name: window_end_date_tr
+        description: Pencerenin son günü (İstanbul).

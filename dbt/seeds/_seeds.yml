@@ -67,3 +67,31 @@ seeds:
               arguments:
                 to: ref('source_types')
                 field: source_type
+
+  - name: source_type_families
+    description: >
+      source_type → kaba yakıt ailesi (plant_family) eşlemesi. Aile kümesi stg_plant_locations
+      ile aynıdır (gas, hydro, coal, solar, wind, geothermal, bio) + 'other' (nükleer, fueloil,
+      nafta, atık ısı). Eşleştirme adaylarını aynı aile içinde aramak için kullanılır.
+      Grain: bir satır = bir source_type.
+    config:
+      column_types:
+        source_type: string
+        plant_family: string
+    columns:
+      - name: source_type
+        description: Kontrollü kaynak türü.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('source_types')
+                field: source_type
+      - name: plant_family
+        description: Kaba yakıt ailesi.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['gas', 'hydro', 'coal', 'solar', 'wind', 'geothermal', 'bio', 'other']
