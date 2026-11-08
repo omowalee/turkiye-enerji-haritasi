@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/mix_24h.schema.json",
+  "title": "Kaynak karması (24 saat)",
+  "description": "Kaynak bazlı saatlik üretim. live: son 24 mevcut saat. plants_day: santral gününün tarihine ait kaynak tablosu (santral toplamlarına eşittir). Tamamı sıfır olan kaynak yazılmaz.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "sources",
+    "live",
+    "plants_day"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0",
+      "description": "Sözleşme sürümü."
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/GeneratedAt",
+      "description": "Dosyanın üretildiği an (+03:00)."
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/SourceType"
+      },
+      "description": "Veride bulunan kaynaklar, gösterim sırasıyla."
+    },
+    "live": {
+      "$ref": "#/$defs/MixLive"
+    },
+    "plants_day": {
+      "$ref": "#/$defs/MixPlantsDay"
+    }
+  },
+  "$defs": {
+    "MixLive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hours",
+        "mw",
+        "ptf_tl_mwh"
+      ],
+      "properties": {
+        "hours": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/Timestamp"
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Son 24 mevcut saat."
+        },
+        "mw": {
+          "$ref": "common.schema.json#/$defs/PerSourceSeries"
+        },
+        "ptf_tl_mwh": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "MixPlantsDay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "hours",
+        "mw",
+        "ptf_tl_mwh"
+      ],
+      "properties": {
+        "date": {
+          "$ref": "common.schema.json#/$defs/LocalDate"
+        },
+        "hours": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/Timestamp"
+          },
+          "minItems": 24,
+          "maxItems": 24,
+          "description": "Günün 24 saat başı."
+        },
+        "mw": {
+          "$ref": "common.schema.json#/$defs/PerSourceSeries"
+        },
+        "ptf_tl_mwh": {
+          "type": "array",
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

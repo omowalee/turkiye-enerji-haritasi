@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/provinces.schema.json",
+  "title": "İl sınırları",
+  "description": "81 il için sadeleştirilmiş GeoJSON FeatureCollection (geoBoundaries). Özellikler: plate, name, iso.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "features"
+  ],
+  "properties": {
+    "type": {
+      "const": "FeatureCollection"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ProvinceFeature"
+      }
+    }
+  },
+  "$defs": {
+    "ProvinceFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "properties",
+        "geometry"
+      ],
+      "properties": {
+        "type": {
+          "const": "Feature"
+        },
+        "properties": {
+          "$ref": "#/$defs/ProvinceProps"
+        },
+        "geometry": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ProvincePolygon"
+            },
+            {
+              "$ref": "#/$defs/ProvinceMultiPolygon"
+            }
+          ]
+        }
+      }
+    },
+    "ProvinceProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plate",
+        "name",
+        "iso"
+      ],
+      "properties": {
+        "plate": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 81
+        },
+        "name": {
+          "type": "string"
+        },
+        "iso": {
+          "type": "string",
+          "pattern": "^TR-\\d{2}$"
+        }
+      }
+    },
+    "ProvincePolygon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "coordinates"
+      ],
+      "properties": {
+        "type": {
+          "const": "Polygon"
+        },
+        "coordinates": {
+          "type": "array"
+        }
+      }
+    },
+    "ProvinceMultiPolygon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "coordinates"
+      ],
+      "properties": {
+        "type": {
+          "const": "MultiPolygon"
+        },
+        "coordinates": {
+          "type": "array"
+        }
+      }
+    }
+  }
+}

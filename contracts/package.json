@@ -1,0 +1,12 @@
+{
+  "name": "contracts",
+  "private": true,
+  "type": "module",
+  "description": "Sözleşme şemalarından TypeScript tipleri üretir.",
+  "scripts": {
+    "gen:types": "node gen-types.mjs"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "15.0.4"
+  }
+}

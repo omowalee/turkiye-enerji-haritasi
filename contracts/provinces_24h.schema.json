@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/provinces_24h.schema.json",
+  "title": "İl bazlı üretim (24 saat)",
+  "description": "Son tam gün için il toplamları. Sadece üretimi sıfırdan büyük iller, sıraya göre.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "date",
+    "hours",
+    "provinces",
+    "unlocated"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0",
+      "description": "Sözleşme sürümü."
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/GeneratedAt",
+      "description": "Dosyanın üretildiği an (+03:00)."
+    },
+    "date": {
+      "$ref": "common.schema.json#/$defs/LocalDate"
+    },
+    "hours": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/Timestamp"
+      },
+      "minItems": 24,
+      "maxItems": 24,
+      "description": "Günün 24 saat başı."
+    },
+    "provinces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ProvinceDay"
+      }
+    },
+    "unlocated": {
+      "$ref": "#/$defs/Unlocated"
+    }
+  },
+  "$defs": {
+    "ProvinceDay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plate",
+        "name",
+        "mw",
+        "mwh_by_source",
+        "total_mwh",
+        "rank",
+        "share_pct",
+        "plant_count"
+      ],
+      "properties": {
+        "plate": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "description": "İl adı (geojson shapeName)."
+        },
+        "mw": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 24,
+          "maxItems": 24
+        },
+        "mwh_by_source": {
+          "$ref": "common.schema.json#/$defs/PerSource"
+        },
+        "total_mwh": {
+          "type": "integer"
+        },
+        "rank": {
+          "type": "integer",
+          "description": "1 = en büyük total_mwh."
+        },
+        "share_pct": {
+          "type": "number",
+          "description": "Ülke toplamı içindeki pay (konumsuz dahil), 1 ondalık."
+        },
+        "plant_count": {
+          "type": "integer"
+        }
+      }
+    },
+    "Unlocated": {
+      "description": "İle atanamayan santraller.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mw",
+        "total_mwh",
+        "plant_count"
+      ],
+      "properties": {
+        "mw": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 24,
+          "maxItems": 24
+        },
+        "total_mwh": {
+          "type": "integer"
+        },
+        "plant_count": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

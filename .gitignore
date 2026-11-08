@@ -40,3 +40,6 @@ logs/
 
 # Kişisel notlar (repoya girmez)
 BASLANGIC.md
+
+# Node
+contracts/node_modules/

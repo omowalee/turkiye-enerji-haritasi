@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/common.schema.json",
+  "title": "Ortak tanımlar",
+  "description": "Diğer şemaların paylaştığı tanımlar: kaynak türleri, zaman damgası, tarih, kaynak bazlı sayı haritaları.",
+  "$defs": {
+    "SourceType": {
+      "description": "Kaynak türü. Sıra, yığılma ve gösterim sırasıdır.",
+      "type": "string",
+      "enum": [
+        "gunes",
+        "ruzgar",
+        "hidro_baraj",
+        "hidro_akarsu",
+        "jeotermal",
+        "biyokutle",
+        "dogalgaz",
+        "ithal_komur",
+        "yerli_komur",
+        "nukleer",
+        "diger"
+      ],
+      "tsType": "SourceType"
+    },
+    "Timestamp": {
+      "description": "Saat başı zaman damgası, Europe/Istanbul sabit +03:00. Örnek: 2026-11-07T23:00:00+03:00.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:00:00\\+03:00$",
+      "tsType": "Timestamp"
+    },
+    "GeneratedAt": {
+      "description": "Üretim anı, +03:00 ofsetli ISO 8601 (dakika/saniye serbest).",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+03:00$",
+      "tsType": "GeneratedAt"
+    },
+    "LocalDate": {
+      "description": "Yerel (Europe/Istanbul) tarih, YYYY-MM-DD.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "tsType": "LocalDate"
+    },
+    "Month": {
+      "description": "Ay, YYYY-MM.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}$",
+      "tsType": "Month"
+    },
+    "PerSource": {
+      "description": "Kaynak türü başına bir sayı. Sadece verisi olan kaynaklar bulunur.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gunes": {
+          "type": "number"
+        },
+        "ruzgar": {
+          "type": "number"
+        },
+        "hidro_baraj": {
+          "type": "number"
+        },
+        "hidro_akarsu": {
+          "type": "number"
+        },
+        "jeotermal": {
+          "type": "number"
+        },
+        "biyokutle": {
+          "type": "number"
+        },
+        "dogalgaz": {
+          "type": "number"
+        },
+        "ithal_komur": {
+          "type": "number"
+        },
+        "yerli_komur": {
+          "type": "number"
+        },
+        "nukleer": {
+          "type": "number"
+        },
+        "diger": {
+          "type": "number"
+        }
+      },
+      "tsType": "PerSource"
+    },
+    "PerSourceSeries": {
+      "description": "Kaynak türü başına sayı dizisi (saatlik seri). Tamamı sıfır olan kaynak yazılmaz.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gunes": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "ruzgar": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "hidro_baraj": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "hidro_akarsu": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "jeotermal": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "biyokutle": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "dogalgaz": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "ithal_komur": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "yerli_komur": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "nukleer": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "diger": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "tsType": "PerSourceSeries"
+    }
+  }
+}

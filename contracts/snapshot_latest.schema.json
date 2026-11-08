@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/snapshot_latest.schema.json",
+  "title": "Anlık özet",
+  "description": "Canlı sayaçlar için en son özet. live: ülke kaynak verisi (yaklaşık 1 saat gecikmeli, sadece lisanslı üretim). plants_day: santral verisinin son tam günü.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "live",
+    "plants_day",
+    "unlicensed_solar",
+    "akkuyu_unit_mw"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0",
+      "description": "Sözleşme sürümü."
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/GeneratedAt",
+      "description": "Dosyanın üretildiği an (+03:00)."
+    },
+    "live": {
+      "$ref": "#/$defs/SnapshotLive"
+    },
+    "plants_day": {
+      "$ref": "#/$defs/SnapshotPlantsDay"
+    },
+    "unlicensed_solar": {
+      "$ref": "#/$defs/SnapshotUnlicensedSolar"
+    },
+    "akkuyu_unit_mw": {
+      "const": 1200,
+      "description": "Akkuyu bir ünitesinin MW değeri; eşdeğer = kaynak MW / 1200."
+    }
+  },
+  "$defs": {
+    "SourceMw": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mw",
+        "akkuyu"
+      ],
+      "properties": {
+        "mw": {
+          "type": "integer",
+          "description": "Ortalama MW (tamsayı)."
+        },
+        "akkuyu": {
+          "type": "number",
+          "description": "Akkuyu eşdeğeri = mw / 1200, 2 ondalık."
+        }
+      }
+    },
+    "SnapshotLive": {
+      "description": "Ülke kaynak bazlı veri, en son saat.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "total_mw",
+        "renewable_share_pct",
+        "by_source",
+        "ptf_tl_mwh"
+      ],
+      "properties": {
+        "ts": {
+          "$ref": "common.schema.json#/$defs/Timestamp",
+          "description": "En son mevcut saatin başlangıcı."
+        },
+        "total_mw": {
+          "type": "integer",
+          "description": "Lisanslı toplam MW (ithalat/ihracat hariç)."
+        },
+        "renewable_share_pct": {
+          "type": "number",
+          "description": "Yenilenebilir pay, yüzde, 1 ondalık."
+        },
+        "by_source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "gunes": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "ruzgar": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "hidro_baraj": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "hidro_akarsu": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "jeotermal": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "biyokutle": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "dogalgaz": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "ithal_komur": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "yerli_komur": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "nukleer": {
+              "$ref": "#/$defs/SourceMw"
+            },
+            "diger": {
+              "$ref": "#/$defs/SourceMw"
+            }
+          },
+          "description": "Sadece verisi bulunan kaynaklar."
+        },
+        "ptf_tl_mwh": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Aynı saat için PTF (TL/MWh); yoksa null."
+        }
+      }
+    },
+    "SnapshotPlantsDay": {
+      "description": "Santral verisinin son tam günü (canlı modda harita bunu gösterir).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "last_hour_ts",
+        "total_mw_last_hour",
+        "plant_count"
+      ],
+      "properties": {
+        "date": {
+          "$ref": "common.schema.json#/$defs/LocalDate"
+        },
+        "last_hour_ts": {
+          "$ref": "common.schema.json#/$defs/Timestamp",
+          "description": "Günün son saati (T23:00)."
+        },
+        "total_mw_last_hour": {
+          "type": "integer",
+          "description": "Santral toplamı, son saat, MW."
+        },
+        "plant_count": {
+          "type": "integer",
+          "description": "O gün üretimi sıfırdan büyük santral sayısı."
+        }
+      }
+    },
+    "SnapshotUnlicensedSolar": {
+      "description": "Lisanssız güneş bilgi notu; aylık ve gecikmeli.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "month",
+        "avg_mw",
+        "peak_mw",
+        "source"
+      ],
+      "properties": {
+        "month": {
+          "$ref": "common.schema.json#/$defs/Month"
+        },
+        "avg_mw": {
+          "type": "integer",
+          "description": "Ay ortalaması, MW."
+        },
+        "peak_mw": {
+          "type": "integer",
+          "description": "Saat-günü bazında ay ortalamasının tepe değeri, MW."
+        },
+        "source": {
+          "const": "ren-ul-gen"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/plants.schema.json",
+  "title": "Santral boyutu",
+  "description": "Santral listesi: ad, baskın kaynak, konum, il ve kapasite. Konumu eşleşmeyen santrallerde lat/lon/province null olur.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "plants"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0",
+      "description": "Sözleşme sürümü."
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/GeneratedAt",
+      "description": "Dosyanın üretildiği an (+03:00)."
+    },
+    "plants": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Plant"
+      }
+    }
+  },
+  "$defs": {
+    "PlantMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "score"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "gem",
+            "osm",
+            null
+          ],
+          "description": "Eşleşen konum kaynağı; eşleşme yoksa null."
+        },
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Ad benzerliği puanı."
+        }
+      }
+    },
+    "Plant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "source",
+        "lat",
+        "lon",
+        "province",
+        "capacity_mw",
+        "match"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "EPİAŞ pp_id."
+        },
+        "name": {
+          "type": "string",
+          "description": "EIC eki atılmış ad."
+        },
+        "source": {
+          "$ref": "common.schema.json#/$defs/SourceType",
+          "description": "Son 30 gün MWh'ye göre baskın kaynak."
+        },
+        "lat": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Enlem, 4 ondalık."
+        },
+        "lon": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Boylam, 4 ondalık."
+        },
+        "province": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 81,
+          "description": "İl plaka kodu."
+        },
+        "capacity_mw": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Kapasite MW (GEM işletmedeki toplam, yoksa OSM, yoksa null)."
+        },
+        "match": {
+          "$ref": "#/$defs/PlantMatch"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/generation_24h.schema.json",
+  "title": "Santral saatlik üretim (24 saat)",
+  "description": "Oynatma verisi, son tam gün. mw[i], plant_ids[i] santralinin 24 saatlik üretimidir (MW, tamsayı). Sadece o gün üretimi sıfırdan büyük santraller.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "date",
+    "hours",
+    "plant_ids",
+    "mw"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0",
+      "description": "Sözleşme sürümü."
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/GeneratedAt",
+      "description": "Dosyanın üretildiği an (+03:00)."
+    },
+    "date": {
+      "$ref": "common.schema.json#/$defs/LocalDate"
+    },
+    "hours": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/Timestamp"
+      },
+      "minItems": 24,
+      "maxItems": 24,
+      "description": "Günün 24 saat başı."
+    },
+    "plant_ids": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "mw": {
+      "description": "Satır i, plant_ids[i] santralinin 24 değeridir.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        },
+        "minItems": 24,
+        "maxItems": 24
+      }
+    }
+  }
+}
