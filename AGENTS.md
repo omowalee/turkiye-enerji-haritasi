@@ -47,6 +47,8 @@ Sürüm planı ve aşamalar: `prompt-surum1.md`. Güncel durum: `docs/ilerleme.m
 
 - `.env`, servis hesabı JSON anahtarları ve şifreler asla commit'lenmez, prompt'lara yazılmaz, ekrana basılmaz.
 - Frontend hiçbir sır kullanmaz. Sadece dışa aktarılmış JSON'ları okur.
+- **Geri alınamayan ya da yıkıcı işlemler önce kullanıcıya sorulur:** BigQuery'de tablo veya dataset silme, süreç sonlandırma (kill/TaskStop), dosya veya klasör silme, push. Ajanın kendi oluşturduğu nesneler de buna dahildir.
+- Arka planda zincirlenmiş shell komutları bırakılmaz. Her komut bitmeden oturum ya da görev kapatılmaz.
 
 ## Git
 
