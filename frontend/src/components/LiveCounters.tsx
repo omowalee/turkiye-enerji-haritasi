@@ -1,7 +1,10 @@
+import { memo } from "react";
 import { Activity, Flame, Leaf, TrendingUp } from "lucide-react";
+import { AnimatedValue } from "@/components/ui/animated-value";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SOURCE_PALETTE } from "@/lib/constants";
+import type { DashboardMode, HourlyCounterSnapshot } from "@/lib/data";
 import {
   formatAkkuyu,
   formatMw,
@@ -9,23 +12,27 @@ import {
   formatPtf,
   formatTimestampParts,
 } from "@/lib/format";
-import type { SnapshotLatest, SourceLabels, SourceType } from "@/types";
+import type { SourceLabels, SourceType } from "@/types";
 
 interface LiveCountersProps {
-  snapshot: SnapshotLatest | null;
+  counter: HourlyCounterSnapshot | null;
   sourceLabels: SourceLabels | null;
+  mode: DashboardMode;
+  animationDurationMs: number;
   loading: boolean;
 }
 
-export function LiveCounters({
-  snapshot,
+export const LiveCounters = memo(function LiveCounters({
+  counter,
   sourceLabels,
+  mode,
+  animationDurationMs,
   loading,
 }: LiveCountersProps) {
   if (loading) {
     return (
       <section
-        aria-label="Canlı üretim sayaçları yükleniyor"
+        aria-label="Üretim sayaçları yükleniyor"
         className="z-10 border-b border-[#1E293B] bg-[#0D1422]/85 px-3 py-3 backdrop-blur-md sm:px-5"
       >
         <div className="mx-auto max-w-[1920px] space-y-3">
@@ -45,13 +52,15 @@ export function LiveCounters({
     );
   }
 
-  if (!snapshot || !sourceLabels) {
+  if (!counter || !sourceLabels) {
     return null;
   }
 
-  const { live } = snapshot;
-  const tsParts = formatTimestampParts(live.ts);
+  const isLive = mode === "live";
+  const tsParts = formatTimestampParts(counter.ts);
+  const fullHourLabel = `${tsParts.date} ${tsParts.hour}`;
   const sourceOrder = sourceLabels.order;
+  const accentColorText = isLive ? "text-[#10B981]" : "text-[#38BDF8]";
 
   // En yüksek üretim yapan kaynağı bul
   let topSourceKey: SourceType = "hydro_dam";
@@ -59,7 +68,7 @@ export function LiveCounters({
   let topSourceAkkuyu = 0;
 
   for (const key of sourceOrder) {
-    const item = live.by_source[key];
+    const item = counter.bySource[key];
     const mw = item?.mw ?? 0;
     if (mw > topSourceMw) {
       topSourceMw = mw;
@@ -75,35 +84,51 @@ export function LiveCounters({
 
   return (
     <section
-      aria-label="Canlı ülke üretim sayaçları"
+      aria-label={
+        isLive ? "Canlı ülke üretim sayaçları" : "Oynatma modu üretim sayaçları"
+      }
       className="z-10 border-b border-[#1E293B] bg-[#0D1422]/90 px-3 py-2.5 backdrop-blur-md sm:px-5"
     >
       <div className="mx-auto max-w-[1920px] space-y-2.5">
         {/* Üst 4 Ana Gösterge Kartı */}
         <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           {/* 1. Toplam Lisanslı Üretim */}
-          <Card className="border-[#1E293B] bg-[#060A12]/85 px-3.5 py-2.5">
+          <Card
+            className={`bg-[#060A12]/85 px-3.5 py-2.5 transition-colors ${
+              isLive ? "border-[#1E293B]" : "border-[#38BDF8]/30"
+            }`}
+          >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
                 Toplam Üretim
               </span>
-              <span className="font-mono-data text-[11px] text-[#10B981] tabular-nums">
-                {tsParts.hour}
+              <span
+                className={`font-mono-data text-[11px] font-medium tabular-nums ${accentColorText}`}
+              >
+                {fullHourLabel}
               </span>
             </div>
             <div className="mt-1 font-display text-xl font-bold tracking-tight text-[#F8FAFC] tabular-nums sm:text-2xl">
-              {formatMw(live.total_mw)}
+              <AnimatedValue
+                value={counter.totalMw}
+                format={formatMw}
+                durationMs={animationDurationMs}
+              />
             </div>
             <div className="mt-0.5 flex items-center justify-between text-[11px] text-[#94A3B8]">
               <span>Lisanslı yurt içi üretim</span>
               <span className="font-mono-data text-[#64748B] tabular-nums">
-                {tsParts.date}
+                {isLive ? "Canlı özet" : "24s oynatma"}
               </span>
             </div>
           </Card>
 
           {/* 2. Yenilenebilir Payı */}
-          <Card className="border-[#1E293B] bg-[#060A12]/85 px-3.5 py-2.5">
+          <Card
+            className={`bg-[#060A12]/85 px-3.5 py-2.5 transition-colors ${
+              isLive ? "border-[#1E293B]" : "border-[#38BDF8]/30"
+            }`}
+          >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
                 Yenilenebilir Payı
@@ -111,7 +136,11 @@ export function LiveCounters({
               <Leaf className="h-3.5 w-3.5 text-[#10B981]" aria-hidden="true" />
             </div>
             <div className="mt-1 font-display text-xl font-bold tracking-tight text-[#10B981] tabular-nums sm:text-2xl">
-              {formatPercent(live.renewable_share_pct)}
+              <AnimatedValue
+                value={counter.renewableSharePct}
+                format={formatPercent}
+                durationMs={animationDurationMs}
+              />
             </div>
             <div className="mt-0.5 flex items-center justify-between text-[11px] text-[#94A3B8]">
               <span>Lisanslı yurt içi üretim</span>
@@ -122,7 +151,11 @@ export function LiveCounters({
           </Card>
 
           {/* 3. Lider Kaynak */}
-          <Card className="border-[#1E293B] bg-[#060A12]/85 px-3.5 py-2.5">
+          <Card
+            className={`bg-[#060A12]/85 px-3.5 py-2.5 transition-colors ${
+              isLive ? "border-[#1E293B]" : "border-[#38BDF8]/30"
+            }`}
+          >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
                 En Büyük Kaynak
@@ -139,25 +172,35 @@ export function LiveCounters({
                 style={{ backgroundColor: topSourceColor }}
                 aria-hidden="true"
               />
-              <span className=" truncate font-display text-base font-bold text-[#F8FAFC] sm:text-lg">
+              <span className="truncate font-display text-base font-bold text-[#F8FAFC] sm:text-lg">
                 {topSourceLabel}
               </span>
             </div>
             <div className="mt-0.5 flex items-center justify-between text-[11px] text-[#94A3B8] tabular-nums">
-              <span className="font-mono-data font-medium text-[#F8FAFC]">
-                {formatMw(Math.max(0, topSourceMw))}
-              </span>
-              <span className="font-mono-data text-[#94A3B8]">
-                {formatAkkuyu(topSourceAkkuyu)}
-              </span>
+              <AnimatedValue
+                value={Math.max(0, topSourceMw)}
+                format={formatMw}
+                durationMs={animationDurationMs}
+                className="font-mono-data font-medium text-[#F8FAFC]"
+              />
+              <AnimatedValue
+                value={topSourceAkkuyu}
+                format={formatAkkuyu}
+                durationMs={animationDurationMs}
+                className="font-mono-data text-[#94A3B8]"
+              />
             </div>
           </Card>
 
-          {/* 4. PTF (Kesinleşmiş Saat) */}
-          <Card className="border-[#1E293B] bg-[#060A12]/85 px-3.5 py-2.5">
+          {/* 4. PTF */}
+          <Card
+            className={`bg-[#060A12]/85 px-3.5 py-2.5 transition-colors ${
+              isLive ? "border-[#1E293B]" : "border-[#38BDF8]/30"
+            }`}
+          >
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8]">
-                PTF (Kesinleşmiş)
+                PTF ({isLive ? "Kesinleşmiş" : tsParts.hour})
               </span>
               <TrendingUp
                 className="h-3.5 w-3.5 text-[#38BDF8]"
@@ -165,12 +208,20 @@ export function LiveCounters({
               />
             </div>
             <div className="mt-1 font-display text-lg font-bold tracking-tight text-[#F8FAFC] tabular-nums sm:text-xl">
-              {formatPtf(live.ptf_tl_mwh)}
+              {counter.ptfTlMwh !== null ? (
+                <AnimatedValue
+                  value={counter.ptfTlMwh}
+                  format={formatPtf}
+                  durationMs={animationDurationMs}
+                />
+              ) : (
+                formatPtf(null)
+              )}
             </div>
             <div className="mt-0.5 flex items-center justify-between text-[11px] text-[#94A3B8]">
               <span>Piyasa Takas Fiyatı</span>
               <span className="font-mono-data text-[#64748B] tabular-nums">
-                {tsParts.hour}
+                {fullHourLabel}
               </span>
             </div>
           </Card>
@@ -186,11 +237,11 @@ export function LiveCounters({
             const meta = sourceLabels.sources[sourceKey];
             const label = meta?.label ?? palette.fallbackLabel;
             const isRenewable = meta?.renewable ?? palette.renewable;
-            const sourceData = live.by_source[sourceKey];
+            const sourceData = counter.bySource[sourceKey];
             const mw = sourceData?.mw ?? 0;
             const akkuyu = sourceData?.akkuyu ?? 0;
             const sharePct =
-              live.total_mw > 0 ? (mw / live.total_mw) * 100 : 0;
+              counter.totalMw > 0 ? (mw / counter.totalMw) * 100 : 0;
             const isZero = mw === 0;
 
             return (
@@ -202,7 +253,7 @@ export function LiveCounters({
                     : "border-[#1E293B] bg-[#151F32]/55 hover:border-[#334155]"
                 }`}
               >
-                {/* Üst satır: Renk noktası + Kaynak etiketi + yüzde */}
+                {/* Üst satır: Renk noktası + Kaynak etiketi + yenilenebilir göstergesi */}
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <span
@@ -234,19 +285,28 @@ export function LiveCounters({
 
                 {/* Orta satır: MW ve Yüzde Payı */}
                 <div className="mt-1 flex items-baseline justify-between gap-1 tabular-nums">
-                  <span className="font-mono-data text-xs font-semibold text-[#F8FAFC]">
-                    {formatMw(mw)}
-                  </span>
-                  <span className="font-mono-data text-[11px] text-[#94A3B8]">
-                    {formatPercent(sharePct)}
-                  </span>
+                  <AnimatedValue
+                    value={mw}
+                    format={formatMw}
+                    durationMs={animationDurationMs}
+                    className="font-mono-data text-xs font-semibold text-[#F8FAFC]"
+                  />
+                  <AnimatedValue
+                    value={sharePct}
+                    format={formatPercent}
+                    durationMs={animationDurationMs}
+                    className="font-mono-data text-[11px] text-[#94A3B8]"
+                  />
                 </div>
 
                 {/* Alt satır: Akkuyu eşdeğeri */}
                 <div className="mt-0.5 flex items-center justify-between text-[11px] text-[#94A3B8] tabular-nums">
-                  <span className="font-mono-data">
-                    {isZero ? "0,00 Akkuyu" : formatAkkuyu(akkuyu)}
-                  </span>
+                  <AnimatedValue
+                    value={akkuyu}
+                    format={formatAkkuyu}
+                    durationMs={animationDurationMs}
+                    className="font-mono-data"
+                  />
                 </div>
               </div>
             );
@@ -255,4 +315,4 @@ export function LiveCounters({
       </div>
     </section>
   );
-}
+});

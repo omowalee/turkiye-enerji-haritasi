@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { MapView, type MapViewState, type PickingInfo } from "@deck.gl/core";
 import { ColumnLayer, GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SOURCE_PALETTE } from "@/lib/constants";
-import type { LocatedPlantPoint } from "@/lib/data";
+import type { DashboardMode, LocatedPlantPoint } from "@/lib/data";
 import {
   evaluateFreshness,
   formatLocalDate,
@@ -38,13 +38,12 @@ interface TurkeyMapProps {
   totalPlantsInCatalog: number;
   snapshot: SnapshotLatest | null;
   sourceLabels: SourceLabels | null;
+  mode: DashboardMode;
   selectedHourIndex: number;
   selectedHourTimestamp: string | null;
+  selectedHourTotalMw: number | null;
+  transitionDurationMs: number;
   loading: boolean;
-}
-
-interface PlantAtHour extends LocatedPlantPoint {
-  currentHourMw: number;
 }
 
 interface SelectedPlantCardState {
@@ -60,6 +59,10 @@ const TURKEY_CENTER = {
 
 const DESKTOP_DEFAULT_PITCH = 45;
 const MOBILE_BREAKPOINT_PX = 768;
+
+function easeCubicOut(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 function getInitialViewState(width: number, is3DMode: boolean): MapViewState {
   const isSmallMobile = width < 640;
@@ -105,14 +108,17 @@ function computeColumnElevationMeters(mw: number): number {
   return 4500 + Math.sqrt(mw) * 3200;
 }
 
-export function TurkeyMap({
+export const TurkeyMap = memo(function TurkeyMap({
   provincesGeoJson,
   plants,
   totalPlantsInCatalog,
   snapshot,
   sourceLabels,
+  mode,
   selectedHourIndex,
   selectedHourTimestamp,
+  selectedHourTotalMw,
+  transitionDurationMs,
   loading,
 }: TurkeyMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -162,21 +168,15 @@ export function TurkeyMap({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedPlantCard]);
 
-  // Seçili saatteki (selectedHourIndex) santral üretimlerini tek seferde hesapla (60fps için useMemo)
-  const plantsAtHour = useMemo<PlantAtHour[]>(() => {
-    return plants.map((plant) => ({
-      ...plant,
-      currentHourMw: plant.hourlyMw[selectedHourIndex] ?? 0,
-    }));
-  }, [plants, selectedHourIndex]);
-
-  // Tıklanmış santral nesnesini seçili saatteki güncel üretimiyle bul
-  const selectedPlant = useMemo<PlantAtHour | null>(() => {
+  // Tıklanmış santral nesnesini bul
+  const selectedPlant = useMemo<LocatedPlantPoint | null>(() => {
     if (!selectedPlantCard) return null;
-    return (
-      plantsAtHour.find((p) => p.id === selectedPlantCard.plantId) ?? null
-    );
-  }, [plantsAtHour, selectedPlantCard]);
+    return plants.find((p) => p.id === selectedPlantCard.plantId) ?? null;
+  }, [plants, selectedPlantCard]);
+
+  const selectedPlantCurrentMw = selectedPlant
+    ? (selectedPlant.hourlyMw[selectedHourIndex] ?? 0)
+    : 0;
 
   const handleZoom = useCallback((delta: number) => {
     setViewState((prev) => ({
@@ -209,7 +209,7 @@ export function TurkeyMap({
   }, []);
 
   const handlePlantHover = useCallback(
-    (info: PickingInfo<PlantAtHour>) => {
+    (info: PickingInfo<LocatedPlantPoint>) => {
       const nextId = info.object?.id ?? null;
       setHoveredPlantId((prev) => (prev === nextId ? prev : nextId));
     },
@@ -217,7 +217,7 @@ export function TurkeyMap({
   );
 
   const handlePlantClick = useCallback(
-    (info: PickingInfo<PlantAtHour>) => {
+    (info: PickingInfo<LocatedPlantPoint>) => {
       if (
         info.object &&
         typeof info.x === "number" &&
@@ -233,7 +233,7 @@ export function TurkeyMap({
     []
   );
 
-  // 1. Türkiye İl Sınırları Katmanı (Santral hover/seçim durumundan bağımsız memoize edilir)
+  // 1. Türkiye İl Sınırları Katmanı (Saat değişiminden ve santral seçiminden bağımsız memoize edilir)
   const provincesLayer = useMemo(() => {
     if (!provincesGeoJson) return null;
     return new GeoJsonLayer<ProvinceFeature["properties"]>({
@@ -271,16 +271,19 @@ export function TurkeyMap({
     });
   }, [provincesGeoJson, hoveredProvincePlate]);
 
-  // 2. Santral Taban Noktaları + 3D Sütun Katmanları (~780 santralde 60fps için optimize)
+  // 2. Santral Taban Noktaları + 3D Sütun Katmanları
+  // `data: plants` referansı sabit tutularak deck.gl'in GPU üzerinde `transitions` ile
+  // sütun yüksekliklerini 60 fps akıcılıkla enterpole etmesi sağlanır.
   const plantLayers = useMemo(() => {
-    if (plantsAtHour.length === 0) return [];
+    if (plants.length === 0) return [];
 
     const selectedId = selectedPlantCard?.plantId ?? null;
+    const colorTransitionMs = Math.min(260, transitionDurationMs);
 
     // Taban noktaları (hem 2D hem 3D modda her santralin konumunu zeminde sabitler)
-    const baseScatterLayer = new ScatterplotLayer<PlantAtHour>({
+    const baseScatterLayer = new ScatterplotLayer<LocatedPlantPoint>({
       id: "plants-scatter-layer",
-      data: plantsAtHour,
+      data: plants,
       pickable: true,
       stroked: true,
       filled: true,
@@ -290,13 +293,16 @@ export function TurkeyMap({
       radiusMinPixels: is3D ? 2.5 : 3,
       radiusMaxPixels: is3D ? 14 : 26,
       getPosition: (d) => [d.lon, d.lat],
-      getRadius: (d) =>
-        is3D
-          ? Math.max(3, computePlantRadiusPx(d.currentHourMw) * 0.55)
-          : computePlantRadiusPx(d.currentHourMw),
+      getRadius: (d) => {
+        const mw = d.hourlyMw[selectedHourIndex] ?? 0;
+        return is3D
+          ? Math.max(3, computePlantRadiusPx(mw) * 0.55)
+          : computePlantRadiusPx(mw);
+      },
       getFillColor: (d) => {
+        const mw = d.hourlyMw[selectedHourIndex] ?? 0;
         const [r, g, b] = SOURCE_PALETTE[d.source].rgb;
-        const alpha = d.currentHourMw > 0 ? (is3D ? 200 : 235) : 110;
+        const alpha = mw > 0 ? (is3D ? 200 : 235) : 105;
         return [r, g, b, alpha];
       },
       getLineColor: (d) => {
@@ -307,6 +313,15 @@ export function TurkeyMap({
       },
       getLineWidth: (d) =>
         d.id === selectedId || d.id === hoveredPlantId ? 2.2 : 1,
+      transitions: {
+        getRadius: {
+          duration: transitionDurationMs,
+          easing: easeCubicOut,
+        },
+        getFillColor: {
+          duration: colorTransitionMs,
+        },
+      },
       updateTriggers: {
         getRadius: [selectedHourIndex, is3D],
         getFillColor: [selectedHourIndex, is3D],
@@ -318,35 +333,48 @@ export function TurkeyMap({
     });
 
     if (!is3D) {
-      // 2D modda üretimi > 0 olan santraller için hafif dış ışıma halkası
-      const activePlants = plantsAtHour.filter((p) => p.currentHourMw > 0);
-      const glowLayer = new ScatterplotLayer<PlantAtHour>({
+      // 2D modda üretimi > 0 olan santraller için yumuşak geçişli dış ışıma halkası
+      const glowLayer = new ScatterplotLayer<LocatedPlantPoint>({
         id: "plants-glow-layer",
-        data: activePlants,
+        data: plants,
         pickable: false,
         stroked: false,
         filled: true,
         radiusUnits: "pixels",
-        radiusMinPixels: 6,
+        radiusMinPixels: 0,
         radiusMaxPixels: 40,
         getPosition: (d) => [d.lon, d.lat],
-        getRadius: (d) => computePlantRadiusPx(d.currentHourMw) * 1.7,
+        getRadius: (d) => {
+          const mw = d.hourlyMw[selectedHourIndex] ?? 0;
+          return mw > 0 ? computePlantRadiusPx(mw) * 1.7 : 0;
+        },
         getFillColor: (d) => {
+          const mw = d.hourlyMw[selectedHourIndex] ?? 0;
           const [r, g, b] = SOURCE_PALETTE[d.source].rgb;
-          return [r, g, b, 42];
+          return [r, g, b, mw > 0 ? 42 : 0];
+        },
+        transitions: {
+          getRadius: {
+            duration: transitionDurationMs,
+            easing: easeCubicOut,
+          },
+          getFillColor: {
+            duration: colorTransitionMs,
+          },
         },
         updateTriggers: {
           getRadius: [selectedHourIndex],
+          getFillColor: [selectedHourIndex],
         },
       });
       return [glowLayer, baseScatterLayer];
     }
 
     // 3D Mod: Santral noktalarının üzerinde yükselen 3D üretim sütunları (ColumnLayer)
-    // diskResolution: 12 ile ~780 sütunda düşük üçgen sayısı ve akıcı 60fps sağlanır.
-    const columnsLayer = new ColumnLayer<PlantAtHour>({
+    // diskResolution: 12 ve GPU `transitions` ile saatler arasında sinematik 60fps geçiş sağlanır.
+    const columnsLayer = new ColumnLayer<LocatedPlantPoint>({
       id: "plants-column-layer",
-      data: plantsAtHour,
+      data: plants,
       pickable: true,
       extruded: true,
       stroked: false,
@@ -360,8 +388,10 @@ export function TurkeyMap({
         specularColor: [255, 255, 255],
       },
       getPosition: (d) => [d.lon, d.lat],
-      getElevation: (d) => computeColumnElevationMeters(d.currentHourMw),
+      getElevation: (d) =>
+        computeColumnElevationMeters(d.hourlyMw[selectedHourIndex] ?? 0),
       getFillColor: (d) => {
+        const mw = d.hourlyMw[selectedHourIndex] ?? 0;
         const [r, g, b] = SOURCE_PALETTE[d.source].rgb;
         if (d.id === selectedId) {
           return [
@@ -379,8 +409,17 @@ export function TurkeyMap({
             250,
           ];
         }
-        const alpha = d.currentHourMw > 0 ? 232 : 0;
+        const alpha = mw > 0 ? 232 : 0;
         return [r, g, b, alpha];
+      },
+      transitions: {
+        getElevation: {
+          duration: transitionDurationMs,
+          easing: easeCubicOut,
+        },
+        getFillColor: {
+          duration: colorTransitionMs,
+        },
       },
       updateTriggers: {
         getElevation: [selectedHourIndex],
@@ -392,9 +431,10 @@ export function TurkeyMap({
 
     return [baseScatterLayer, columnsLayer];
   }, [
-    plantsAtHour,
+    plants,
     is3D,
     selectedHourIndex,
+    transitionDurationMs,
     hoveredPlantId,
     selectedPlantCard?.plantId,
     handlePlantHover,
@@ -406,6 +446,7 @@ export function TurkeyMap({
     return [provincesLayer, ...plantLayers];
   }, [provincesLayer, plantLayers]);
 
+  const isPlayback = mode === "playback";
   const plantsDayDate = snapshot?.plants_day.date ?? "";
   const plantsDayDateTr = plantsDayDate ? formatLocalDate(plantsDayDate) : "";
   const selectedHourParts = selectedHourTimestamp
@@ -417,13 +458,15 @@ export function TurkeyMap({
     : null;
 
   const unlicensed = snapshot?.unlicensed_solar;
+  const displayedHourTotalMw =
+    selectedHourTotalMw ?? snapshot?.plants_day.total_mw_last_hour ?? 0;
 
   return (
     <main
       ref={containerRef}
       aria-label="Türkiye santral üretim haritası"
       onContextMenu={(e) => e.preventDefault()}
-      className="relative flex-1 min-h-[420px] w-full overflow-hidden bg-[#060A12] select-none"
+      className="relative flex-1 min-h-[380px] w-full overflow-hidden bg-[#060A12] select-none"
     >
       {/* Harita Yükleniyor Durumu */}
       {loading && (
@@ -458,20 +501,15 @@ export function TurkeyMap({
         </div>
       )}
 
-      {/* deck.gl Harita Kanvası (Sağ tık veya Ctrl+sürükle ile döndürme ve eğme aktif) */}
+      {/* deck.gl Harita Kanvası */}
       <DeckGL
         views={new MapView({ id: "turkey-map", repeat: false })}
         viewState={viewState}
         onViewStateChange={({ viewState: nextViewState }) => {
-          const next = nextViewState as MapViewState;
-          setViewState(next);
+          setViewState(nextViewState as MapViewState);
         }}
         onClick={(info: PickingInfo) => {
-          // Santral dışındaki boş alana veya il poligonuna tıklandığında açık santral kartını kapat
-          if (
-            !info.object ||
-            info.layer?.id === "turkey-provinces-layer"
-          ) {
+          if (!info.object || info.layer?.id === "turkey-provinces-layer") {
             setSelectedPlantCard(null);
           }
         }}
@@ -493,7 +531,11 @@ export function TurkeyMap({
       {snapshot && (
         <div className="pointer-events-none absolute top-3 left-3 z-10 flex max-w-[calc(100%-4.5rem)] flex-col items-start gap-2 sm:top-4 sm:left-5 sm:max-w-md">
           {/* Zorunlu "Santral verisi: [plants_day.date]" etiketi */}
-          <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border border-[#1E293B] bg-[#0D1422]/90 px-3 py-2 shadow-lg backdrop-blur-md">
+          <div
+            className={`pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border bg-[#0D1422]/90 px-3 py-2 shadow-lg backdrop-blur-md transition-colors ${
+              isPlayback ? "border-[#38BDF8]/50" : "border-[#1E293B]"
+            }`}
+          >
             <div className="flex items-center gap-1.5 text-xs font-medium text-[#F8FAFC]">
               <Calendar
                 className="h-3.5 w-3.5 shrink-0 text-[#38BDF8]"
@@ -504,7 +546,7 @@ export function TurkeyMap({
                 <strong className="font-mono-data font-semibold text-[#38BDF8] tabular-nums">
                   {plantsDayDate}
                 </strong>{" "}
-                <span className="text-[#94A3B8]">
+                <span className="font-mono-data text-[#94A3B8] tabular-nums">
                   ({plantsDayDateTr}
                   {selectedHourParts ? ` · ${selectedHourParts.hour}` : ""})
                 </span>
@@ -513,9 +555,9 @@ export function TurkeyMap({
 
             <div className="flex items-center gap-2 border-l border-[#1E293B] pl-2 font-mono-data text-[11px] text-[#94A3B8] tabular-nums">
               <span>
-                Son saat:{" "}
+                {isPlayback ? "Seçili saat:" : "Son saat:"}{" "}
                 <strong className="text-[#F8FAFC]">
-                  {formatMw(snapshot.plants_day.total_mw_last_hour)}
+                  {formatMw(displayedHourTotalMw)}
                 </strong>
               </span>
               <span>·</span>
@@ -676,10 +718,9 @@ export function TurkeyMap({
               1.500+ MW
             </span>
             <span className="border-l border-[#1E293B] pl-3 text-[#64748B]">
-              Santral detayı: <strong className="text-[#94A3B8]">Sol tık</strong>{" "}
-              · Eğ / döndür:{" "}
-              <strong className="text-[#94A3B8]">Sağ tık</strong> veya{" "}
-              <strong className="text-[#94A3B8]">Ctrl + sürükle</strong>
+              Detay: <strong className="text-[#94A3B8]">Sol tık</strong> · Eğ /
+              döndür: <strong className="text-[#94A3B8]">Sağ tık</strong> ·
+              Oynat: <strong className="text-[#94A3B8]">Boşluk / ← →</strong>
             </span>
           </div>
         </div>
@@ -697,7 +738,7 @@ export function TurkeyMap({
             ),
             top: Math.min(
               Math.max(12, selectedPlantCard.y - 16),
-              (containerRef.current?.clientHeight ?? 420) - 180
+              (containerRef.current?.clientHeight ?? 380) - 180
             ),
           }}
           className="pointer-events-auto absolute z-30 w-64 rounded-lg border border-[#38BDF8]/50 bg-[#0D1422]/95 p-3.5 text-xs shadow-2xl backdrop-blur-md"
@@ -737,7 +778,7 @@ export function TurkeyMap({
                 Üretim ({selectedHourParts?.hour ?? "23:00"}):
               </span>
               <span className="font-mono-data text-sm font-bold text-[#F8FAFC]">
-                {formatMw(selectedPlant.currentHourMw)}
+                {formatMw(selectedPlantCurrentMw)}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -753,4 +794,4 @@ export function TurkeyMap({
       )}
     </main>
   );
-}
+});

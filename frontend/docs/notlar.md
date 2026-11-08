@@ -54,3 +54,14 @@
 2. **Karekök Yükseklik Ölçeği (`computeColumnElevationMeters`):** `1 MW` ile `~1.912 MW` arasındaki ~1:1900 dinamik aralığı Türkiye ölçeğinde okunabilir kılmak için `4500 + sqrt(MW) * 3200` metre karekök ölçek uygulandı (`0 MW` santraller `0 m` kalır, `5 MW` ~11,6 km ile görünür olur, `1.500 MW` ~128,4 km ile ekrandan taşmadan yükselir).
 3. **Eğim, Döndürme ve 2D/3D Geçişi:** Masaüstünde (`>= 768px`) varsayılan `45°` eğim (3D), mobilde (`< 768px`) varsayılan `0°` düz görünüm (2D) ayarlandı; sağ tık veya `Ctrl + sürükle` ile döndürme/eğme (`dragRotate: true`) ve sağ altta `"2D / 3D"` geçiş düğmesi eklendi.
 4. **Tek Saat State'i ve Tıklamayla Açılan Santral Kartı:** Seçili saat indeksi (`selectedHourIndex`, şimdilik `23` / `23:00`) `App.tsx` içinde tek bir state'te tutuldu; santrale tıklandığında (`onClick`) ad, kaynak (Türkçe etiket), o saatteki `MW` ve kurulu güç (`null` ise `"bilinmiyor"`) bilgilerini `tr-TR` biçiminde gösteren kart açılacak şekilde güncellendi.
+
+---
+
+## 5. Üçüncü Adım — 24 Saatlik Oynatma ve İki Mod (Canlı / Oynatma)
+
+1. **Mod Seçici ve Görsel Ayrım (`src/components/HeaderBar.tsx`):** Üst barda `"Canlı"` (`#10B981`, yeşil parlayan nokta) ve `"Oynatma (24 saat)"` (`#38BDF8`, mavi oynatma rozeti) mod seçicisi eklendi.
+2. **İki Modun Veri Bağlantısı (`src/lib/data.ts`, `src/components/LiveCounters.tsx`):**
+   - **Canlı Mod (Varsayılan):** Sayaçlar `snapshot_latest.live` (`live.ts = 08.11.2026 10:00`) verisini gösterir (`live.provisional` gösterilmez); harita `generation_24h` son saatinde (`23:00`) ve `"Santral verisi: 2026-11-07"` etiketiyle durur.
+   - **Oynatma Modu:** Sayaçlar, harita ve seçili saat aynı güne (`plants_day.date`) ve aynı saate senkronize olur; toplam MW, yenilenebilir payı (`source_labels.json` `renewable` alanına göre), Akkuyu eşdeğeri (`mw / 1200`) ve PTF (`ptf_tl_mwh[saat]`) `mix_24h.plants_day` serisinden hesaplanır.
+3. **24 Saatlik Zaman Çubuğu (`src/components/PlaybackBar.tsx`):** Altta oynat/duraklat, hız seçimi (`1×`, `2×`, `4×`), 24 saat işaretli mini üretim profilli sürüklenebilir imleç ve klavye kısayolları (`Boşluk` = oynat/duraklat, `←`/`→` = 1 saat geri/ileri) eklendi; gün sonunda (`23:00`) başa (`00:00`) sarıp durur, döngüye girmez.
+4. **Sinematik 60 FPS Akıcılık (`src/components/ui/animated-value.tsx`, `src/components/TurkeyMap.tsx`):** Sütun yükseklikleri ve nokta yarıçapları `deck.gl` GPU `transitions` (cubic-out, süre = adım süresi) ile yumuşak geçer; sayaç rakamları React yeniden render'ı tetiklemeden doğrudan DOM `requestAnimationFrame` ile yuvarlanarak değişir.

@@ -11,6 +11,8 @@ const badgeVariants = cva(
           "border-[#1E293B] bg-[#151F32] text-[#F8FAFC]",
         live:
           "border-[#10B981]/40 bg-[#10B981]/10 text-[#10B981]",
+        playback:
+          "border-[#38BDF8]/40 bg-[#38BDF8]/12 text-[#38BDF8]",
         warning:
           "border-[#F59E0B]/50 bg-[#451A03]/80 text-[#F59E0B]",
         error:
