@@ -1,0 +1,39 @@
+# Gizli bilgiler
+.env
+*.json.key
+gcp-*.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Proje dışı eski dosyalar
+kumar.py
+a.py
+
+# Keşif çıktıları (ham örnekler)
+scratch/output/
+
+# Ham indirilen veri (GEM vb.)
+data/raw/
+
+# EPİAŞ oturum anahtarı önbelleği (eptr2)
+.eptr2-tgt
+
+# GCP servis hesabı anahtarları
+*-key.json
+*credentials*.json
+service-account*.json
+
+# dbt
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+target/
+logs/
+
+# Araç önbellekleri ve yedekler
+.pytest_cache/
+.claude-yedek/
+.claude/settings.local.json

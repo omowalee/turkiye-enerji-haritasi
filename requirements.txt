@@ -1,0 +1,11 @@
+eptr2==1.4.0
+python-dotenv
+pandas
+pyarrow
+db-dtypes
+google-cloud-bigquery
+tenacity
+rapidfuzz
+openpyxl
+shapely
+pytest
