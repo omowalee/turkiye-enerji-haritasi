@@ -171,3 +171,51 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [hour_start_at_utc, source_type]
+
+  - name: agg_generation_by_province_hourly
+    description: >
+      Grain: bir satır = bir saat x bir il (province_key) x bir source_type. Santral verisi (rt-gen-bulk),
+      lisanslı. Konumu ya da ili bilinmeyen santrallerin üretimi atılmaz: plate_code NULL,
+      is_unlocated = true, province_key = 0 satırında toplanır; saat toplamı fct_generation_hourly ile aynıdır.
+      Artımlı (merge), son var('lookback_hours') saat yeniden işlenir. Eşleştirme değişince
+      (plant_match_overrides, plant_match_candidates) `--full-refresh` gerekir; unutulursa
+      assert_province_agg_matches_current_matching testi son 7 günde yakalar.
+    columns:
+      - name: hour_start_at_utc
+        description: Saatin BAŞLANGICI, UTC. Bölüm kolonu.
+        data_tests: [not_null]
+      - name: hour_start_tr
+        description: Saatin BAŞLANGICI, İstanbul yerel saati (DATETIME).
+        data_tests: [not_null]
+      - name: date_tr
+        description: İstanbul yerel günü.
+        data_tests: [not_null]
+      - name: province_key
+        description: MERGE anahtarı = plate_code; konumsuz satırda 0. Analizde plate_code / is_unlocated kullanın.
+        data_tests: [not_null]
+      - name: plate_code
+        description: İl plaka kodu (1-81). Konumsuz satırda NULL.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_provinces')
+                field: plate_code
+      - name: province_name
+        description: İl adı. Konumsuz satırda NULL.
+      - name: is_unlocated
+        description: Bu satır konumu/ili bilinmeyen santrallerin toplamı mı ("konum bilinmiyor").
+        data_tests: [not_null]
+      - name: source_type
+        description: Kontrollü kaynak türü (santral üretiminin yakıtı).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['solar', 'wind', 'hydro_dam', 'hydro_river', 'natural_gas', 'imported_coal', 'lignite', 'geothermal', 'biomass', 'nuclear', 'other']
+      - name: generation_mw
+        description: O saatteki ortalama güç, MW (= saatlik MWh), ilin o kaynaktaki santralleri toplamı.
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [hour_start_at_utc, province_key, source_type]
