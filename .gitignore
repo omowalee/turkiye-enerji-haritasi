@@ -37,3 +37,6 @@ logs/
 .pytest_cache/
 .claude-yedek/
 .claude/settings.local.json
+
+# Kişisel notlar (repoya girmez)
+BASLANGIC.md
