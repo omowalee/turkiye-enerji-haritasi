@@ -219,3 +219,62 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [hour_start_at_utc, province_key, source_type]
+
+  - name: mart_live_snapshot
+    description: >
+      Grain: tek satır (assert_live_snapshot_one_row). Panelin "şu an" özeti (snapshot_latest.json).
+      Kesinleşmiş saat kuralı (sözleşme, karar 2026-11-08): live saati = ülke verisindeki en yeni saat
+      - 1 saat (assert_live_hour_is_one_before_latest); en yeni saat ön veridir, provisional_* kolonlarında.
+      plants_day = santral verisinin 24 saati tam en son yerel günü (son 14 gün içinde aranır; yoksa NULL
+      ve not_null testi düşer). Lisanssız güneş notu son yayımlanan aydan. Toplamlar lisanslı yurt içi
+      üretim, dış ticaret hariç.
+    columns:
+      - name: live_hour_start_at_utc
+        description: Kesinleşmiş (live) saatin BAŞLANGICI, UTC = provisional_hour_start_at_utc - 1 saat.
+        data_tests: [not_null]
+      - name: live_hour_start_tr
+        description: Aynı saat, İstanbul yerel saati (DATETIME).
+        data_tests: [not_null]
+      - name: live_total_mw
+        description: Live saatin lisanslı yurt içi üretimi, MW. Saat verisi yoksa NULL (test düşer).
+        data_tests: [not_null]
+      - name: live_renewable_share_pct
+        description: Live saatin yenilenebilir payı, yüzde.
+        data_tests: [not_null]
+      - name: live_price_try_per_mwh
+        description: Live saatin PTF'si, TL/MWh. Yoksa NULL.
+      - name: live_by_source
+        description: >
+          Live saatin kaynak dağılımı, ARRAY<STRUCT<source_type, generation_mw, share_pct>>, source_types
+          sırasında. Sıfır üretimli kaynaklar da vardır (dışa aktarma sözleşme gereği atar).
+      - name: provisional_hour_start_at_utc
+        description: Ülke verisindeki en yeni saat (ön veri), UTC.
+        data_tests: [not_null]
+      - name: provisional_hour_start_tr
+        description: Aynı saat, İstanbul yerel saati.
+      - name: provisional_total_mw
+        description: Ön veri saatinin toplamı, MW (sonradan yukarı revize edilebilir).
+        data_tests: [not_null]
+      - name: plants_day_date_tr
+        description: Santral verisinin 24 saati tam en son yerel günü (canlı modda haritanın günü).
+        data_tests: [not_null]
+      - name: plants_day_last_hour_start_at_utc
+        description: O günün son saatinin BAŞLANGICI (yerel 23:00), UTC.
+        data_tests: [not_null]
+      - name: plants_day_last_hour_start_tr
+        description: Aynı saat, İstanbul yerel saati.
+      - name: plants_day_total_mw_last_hour
+        description: O saatteki santral toplamı, MW.
+        data_tests: [not_null]
+      - name: plants_day_plant_count
+        description: O gün toplam üretimi > 0 olan santral sayısı (generation_24h.json ile aynı küme).
+        data_tests: [not_null]
+      - name: unlicensed_solar_month
+        description: Lisanssız verinin son yayımlanan ayının ilk günü (DATE).
+        data_tests: [not_null]
+      - name: unlicensed_solar_avg_mw
+        description: O ayın ortalama lisanssız güneş üretimi, MW (ren-ul-gen gunes). Sayaçlara eklenmez.
+        data_tests: [not_null]
+      - name: unlicensed_solar_peak_mw
+        description: O ayda yerel saat başına ortalamaların en büyüğü, MW ("öğlen tepe").
+        data_tests: [not_null]
