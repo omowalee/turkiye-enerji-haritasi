@@ -79,6 +79,27 @@ plants_day_count as (
     )
 ),
 
+-- ulke dengesi (tuketim ~1 saat gec yayimlanir; yoksa NULL)
+live_balance as (
+    select
+        any_value(b.consumption_mw) as live_consumption_mw,
+        any_value(b.net_import_mw) as live_net_import_mw,
+        any_value(b.balance_mw) as live_balance_mw
+    from {{ ref('agg_country_balance_hourly') }} as b
+    inner join live_hour as h
+        on b.hour_start_at_utc = h.live_hour_start_at_utc
+),
+
+plants_day_balance as (
+    select
+        any_value(b.consumption_mw) as plants_day_consumption_mw_last_hour,
+        any_value(b.net_import_mw) as plants_day_net_import_mw_last_hour,
+        any_value(b.balance_mw) as plants_day_balance_mw_last_hour
+    from {{ ref('agg_country_balance_hourly') }} as b
+    inner join plants_day_stats as s
+        on b.hour_start_at_utc = s.plants_day_last_hour_start_at_utc
+),
+
 -- lisanssiz gunes: son yayimlanan ay; tepe = yerel saat basina aylik ortalamalarin en buyugu
 unlicensed_last_month as (
     select
@@ -113,6 +134,9 @@ select
     l.live_renewable_share_pct,
     l.live_price_try_per_mwh,
     l.live_by_source,
+    lb.live_consumption_mw,
+    lb.live_net_import_mw,
+    lb.live_balance_mw,
     h.provisional_hour_start_at_utc,
     datetime(h.provisional_hour_start_at_utc, 'Europe/Istanbul') as provisional_hour_start_tr,
     p.provisional_total_mw,
@@ -121,6 +145,9 @@ select
     ds.plants_day_last_hour_start_tr,
     dl.plants_day_total_mw_last_hour,
     dc.plants_day_plant_count,
+    db.plants_day_consumption_mw_last_hour,
+    db.plants_day_net_import_mw_last_hour,
+    db.plants_day_balance_mw_last_hour,
     u.unlicensed_solar_month,
     u.unlicensed_solar_avg_mw,
     u.unlicensed_solar_peak_mw
@@ -132,3 +159,5 @@ cross join plants_day_stats as ds
 cross join plants_day_last_hour as dl
 cross join plants_day_count as dc
 cross join unlicensed as u
+cross join live_balance as lb
+cross join plants_day_balance as db

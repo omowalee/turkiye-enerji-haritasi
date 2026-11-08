@@ -250,6 +250,12 @@ models:
         description: >
           Live saatin kaynak dağılımı, ARRAY<STRUCT<source_type, generation_mw, share_pct>>, source_types
           sırasında. Sıfır üretimli kaynaklar da vardır (dışa aktarma sözleşme gereği atar).
+      - name: live_consumption_mw
+        description: Live saatin tüketimi, MW (rt-cons). Tüketim ~1 saat geç yayımlanır; yoksa NULL.
+      - name: live_net_import_mw
+        description: Live saatin net dış ticareti, MW (+ = net ithalat, - = net ihracat).
+      - name: live_balance_mw
+        description: Live saatte lisanslı üretim - tüketim, MW (gündüz negatifi çoğunlukla lisanssız güneş). Tüketim yoksa NULL.
       - name: provisional_hour_start_at_utc
         description: Ülke verisindeki en yeni saat (ön veri), UTC.
         data_tests: [not_null]
@@ -272,6 +278,12 @@ models:
       - name: plants_day_plant_count
         description: O gün toplam üretimi > 0 olan santral sayısı (generation_24h.json ile aynı küme).
         data_tests: [not_null]
+      - name: plants_day_consumption_mw_last_hour
+        description: Santral gününün son saatinde (yerel 23:00) tüketim, MW. Yoksa NULL.
+      - name: plants_day_net_import_mw_last_hour
+        description: Aynı saatte net dış ticaret, MW (+ = net ithalat).
+      - name: plants_day_balance_mw_last_hour
+        description: Aynı saatte ülke lisanslı üretimi - tüketim, MW. Tüketim yoksa NULL.
       - name: unlicensed_solar_month
         description: Lisanssız verinin son yayımlanan ayının ilk günü (DATE).
         data_tests: [not_null]
