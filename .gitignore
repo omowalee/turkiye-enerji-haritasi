@@ -53,3 +53,6 @@ frontend/dist/
 # Docker / yerel yayın
 secrets/
 build/
+
+# Frontend yerel ayar
+frontend/.env.local
