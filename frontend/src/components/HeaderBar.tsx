@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { AlertTriangle, Clock, Play, Radio, Zap } from "lucide-react";
+import { PipelineStatusControl } from "@/components/PipelineStatusDrawer";
 import { Badge } from "@/components/ui/badge";
 import type { DashboardMode } from "@/lib/data";
 import {
@@ -203,6 +204,7 @@ export const HeaderBar = memo(function HeaderBar({
               </div>
             )
           ) : null}
+          <PipelineStatusControl />
         </div>
       </div>
     </header>
