@@ -192,7 +192,7 @@ export const SourceFilterBar = memo(function SourceFilterBar({
       {/* MASAÜSTÜ (>= 768px): Haritanın üst ortasında yarı saydam cam görünümlü yatay düğme grubu */}
       <nav
         aria-label="Kaynak filtresi düğmeleri"
-        className="pointer-events-auto fixed top-4 left-[444px] right-16 z-20 hidden justify-center md:flex xl:right-[456px]"
+        className="pointer-events-auto fixed top-4 left-[444px] right-[216px] z-20 hidden justify-center md:flex"
       >
         <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-white/12 bg-[#060B14]/80 p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.75)] backdrop-blur-xl">
           {buttons.map((btn) => renderFilterChip(btn, false))}

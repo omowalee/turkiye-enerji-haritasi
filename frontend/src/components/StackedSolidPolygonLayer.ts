@@ -8,36 +8,27 @@ export interface StackedSolidPolygonLayerProps<DataT = unknown>
   extends SolidPolygonLayerProps<DataT> {
   /**
    * Dilimin taban yüksekliği (z-offset, metre).
-   * Altındaki dilimlerin yükseklik toplamı + hover durumunda havaya kalkma (lift) yüksekliği.
+   * Hover durumunda havaya kalkma (lift) yüksekliği.
    */
   getBaseElevation?: Accessor<DataT, number>;
   /**
-   * Poligon parçasının [lon, lat] ağırlık merkezi.
-   * Üst dilimlerin teraslı (stepped) olarak merkeze doğru ölçeklenmesi için kullanılır.
+   * Dilimin güney-kuzey (aşağıdan yukarıya) enlem aralığı [minLat, maxLat].
+   * İlin gerçek yüzey alanına göre hesaplanan yatay şerit sınırlarıdır.
    */
-  getCentroid?: Accessor<DataT, [number, number]>;
-  /**
-   * Dilimin yatay ölçek oranı (0..1).
-   * En alttaki en büyük dilim = 1.0 (ilin tam sınırı); üstteki dilimler kalan payın karekökü
-   * oranında kademeli küçülerek 50° kamera açısında her dilimin hem yandan hem üstten
-   * gerçek payıyla okunmasını sağlar.
-   */
-  getScaleRatio?: Accessor<DataT, number>;
+  getBandLatBounds?: Accessor<DataT, [number, number]>;
 }
 
 const defaultProps: DefaultProps<StackedSolidPolygonLayerProps> = {
   getBaseElevation: { type: "accessor", value: 0 },
-  getCentroid: { type: "accessor", value: [0, 0] },
-  getScaleRatio: { type: "accessor", value: 1 },
+  getBandLatBounds: { type: "accessor", value: [-90, 90] },
 };
 
 /**
  * SolidPolygonLayer alt sınıfı:
  * Her il × kaynak diliminin 2B poligon geometrisini yalnızca BİR KEZ üçgenler (earcut),
- * dilimin taban yüksekliğini (getBaseElevation), dilim kalınlığını (getElevation) ve
- * teras ölçeğini (getScaleRatio) doğrudan GPU özniteliği (attribute) olarak taşır ve
- * GPU üzerinde yumuşak geçiş (transition) yapar.
- * Sıfır yüksekliğe inen dilimler vertex shader'da elenerek Z-fighting önlenir.
+ * il bloğunun yüksekliğini (getElevation), hover kalkışını (getBaseElevation) ve
+ * güneyden kuzeye alan-oranlı yatay şerit sınırlarını (getBandLatBounds)
+ * doğrudan GPU özniteliği (attribute) olarak taşır ve GPU üzerinde yumuşak geçiş (transition) yapar.
  */
 export class StackedSolidPolygonLayer<
   DataT = unknown,
@@ -62,19 +53,12 @@ export class StackedSolidPolygonLayer<
           defaultValue: 0,
           bufferGroup: "solid-polygon-instance-data",
         },
-        centroids: {
+        bandLatBounds: {
           size: 2,
           stepMode: "dynamic",
-          accessor: "getCentroid",
-          defaultValue: [0, 0],
-          bufferGroup: "solid-polygon-instance-data",
-        },
-        scaleRatios: {
-          size: 1,
-          stepMode: "dynamic",
           transition: true,
-          accessor: "getScaleRatio",
-          defaultValue: 1,
+          accessor: "getBandLatBounds",
+          defaultValue: [-90, 90],
           bufferGroup: "solid-polygon-instance-data",
         },
       });
@@ -83,20 +67,25 @@ export class StackedSolidPolygonLayer<
 
   getShaders(type: "top" | "side"): ReturnType<SolidPolygonLayer["getShaders"]> {
     const shaders = super.getShaders(type);
-    if (typeof shaders.vs !== "string") {
+    if (typeof shaders.vs !== "string" || typeof shaders.fs !== "string") {
       return shaders;
     }
 
     let vs = shaders.vs
       .replace(
         "in float elevations;",
-        "in float elevations;\nin float baseElevations;\nin vec2 centroids;\nin float scaleRatios;"
+        "in float elevations;\nin float baseElevations;\nin vec2 bandLatBounds;\nout float vWorldLat;\nout vec2 vBandLatBounds;"
       )
       .replace(
         "vec3 pos = props.positions;\nvec3 pos64Low = props.positions64Low;",
-        `vec3 pos = props.positions;
-pos.xy = centroids + (pos.xy - centroids) * scaleRatios;
-vec3 pos64Low = props.positions64Low * vec3(scaleRatios, scaleRatios, 1.0);`
+        `vWorldLat = props.positions.y;
+vBandLatBounds = bandLatBounds;
+if (bandLatBounds.y - bandLatBounds.x <= 1e-6) {
+  gl_Position = vec4(0.0);
+  return;
+}
+vec3 pos = props.positions;
+vec3 pos64Low = props.positions64Low;`
       );
 
     if (type === "top") {
@@ -113,9 +102,28 @@ props.elevations = baseElevations + elevations * positions.y;`
       );
     }
 
+    const fs = shaders.fs
+      .replace(
+        "in vec4 vColor;",
+        "in vec4 vColor;\nin float vWorldLat;\nin vec2 vBandLatBounds;"
+      )
+      .replace(
+        "fragColor = vColor;",
+        `if (vBandLatBounds.y - vBandLatBounds.x <= 1e-6 || vWorldLat < vBandLatBounds.x || vWorldLat > vBandLatBounds.y) {
+  discard;
+}
+fragColor = vColor;
+float bandEdgeDist = min(vWorldLat - vBandLatBounds.x, vBandLatBounds.y - vWorldLat);
+float latFw = max(fwidth(vWorldLat), 1e-5);
+if (bandEdgeDist < latFw * 0.65) {
+  fragColor.rgb *= 0.78;
+}`
+      );
+
     return {
       ...shaders,
       vs,
+      fs,
     };
   }
 }

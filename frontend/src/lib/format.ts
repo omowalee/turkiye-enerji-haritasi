@@ -207,3 +207,81 @@ export function evaluateFreshness(
     label: `${roundedHours} saat önce`,
   };
 }
+
+/**
+ * ISO 8601 (+03:00) zaman damgasını İstanbul saatiyle Türkçe tarih ve saat olarak döndürür.
+ * Örnek: "2026-11-10T11:51:40+03:00" -> "10.11.2026 11:51"
+ */
+export function formatIstanbulDateTime(isoTs: string): string {
+  const parts = formatTimestampParts(isoTs);
+  return parts.full;
+}
+
+/**
+ * Son başarılı çalışma zamanını "x dk/saat önce" biçiminde Türkçe döndürür.
+ */
+export function formatRelativeTimeTr(
+  isoTs: string | null,
+  nowMs: number = Date.now()
+): string {
+  if (!isoTs) return "hiç yok";
+  const parsed = Date.parse(isoTs);
+  if (Number.isNaN(parsed)) return "—";
+  const diffSec = Math.max(0, Math.floor((nowMs - parsed) / 1000));
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 1) {
+    return "az önce";
+  }
+  if (diffMin < 60) {
+    return `${formatNumber(diffMin)} dk önce`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  return `${formatNumber(diffHours)} saat önce`;
+}
+
+/**
+ * Saniye cinsinden süreyi Türkçe biçimlendirir (ör. "36 sn", "1 dk 32 sn").
+ */
+export function formatDurationSeconds(totalSeconds: number): string {
+  const sec = Math.max(0, Math.round(totalSeconds));
+  if (sec < 60) {
+    return `${formatNumber(sec)} sn`;
+  }
+  const mins = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  if (mins < 60) {
+    return remSec > 0
+      ? `${formatNumber(mins)} dk ${formatNumber(remSec)} sn`
+      : `${formatNumber(mins)} dk`;
+  }
+  const hours = Math.floor(mins / 60);
+  const remMin = mins % 60;
+  return remMin > 0
+    ? `${formatNumber(hours)} sa ${formatNumber(remMin)} dk`
+    : `${formatNumber(hours)} sa`;
+}
+
+/**
+ * Adım süresini (ended_at - started_at; çalışıyorsa started_at'ten şimdiye canlı sayaç) hesaplar.
+ */
+export function formatStepDuration(
+  startedAt: string | null,
+  endedAt: string | null,
+  isRunning: boolean,
+  nowMs: number = Date.now()
+): string | null {
+  if (!startedAt) return null;
+  const startMs = Date.parse(startedAt);
+  if (Number.isNaN(startMs)) return null;
+
+  if (isRunning || !endedAt) {
+    if (!isRunning && !endedAt) return null;
+    const elapsedSec = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+    return formatDurationSeconds(elapsedSec);
+  }
+
+  const endMs = Date.parse(endedAt);
+  if (Number.isNaN(endMs)) return null;
+  const durationSec = Math.max(0, Math.round((endMs - startMs) / 1000));
+  return formatDurationSeconds(durationSec);
+}

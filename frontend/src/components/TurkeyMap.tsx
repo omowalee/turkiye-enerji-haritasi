@@ -88,12 +88,20 @@ interface ProvincePolygonPart {
   centroid: [number, number];
 }
 
+export interface ProvinceAreaLatTable {
+  minLat: number;
+  maxLat: number;
+  /** 0..N kümülatif alan kesri dizisi (0.0 -> 1.0, güneyden kuzeye) */
+  cumAreaFractions: Float64Array;
+}
+
 export interface ProvinceGeometryMeta {
   labels: ProvinceLabelItem[];
   centroidByPlate: Map<number, [number, number]>;
   polygonParts: ProvincePolygonPart[];
   outerBorderPaths: [number, number][][];
   featureByPlate: Map<number, ProvinceFeature>;
+  areaLatTableByPlate: Map<number, ProvinceAreaLatTable>;
 }
 
 interface ProvinceSliceInstance {
@@ -108,7 +116,7 @@ interface ProvinceSliceInstance {
 interface SliceVisualMetrics {
   baseElevationM: number;
   sliceElevationM: number;
-  scaleRatio: number;
+  bandLatBounds: [number, number];
   fillColor: [number, number, number, number];
 }
 
@@ -195,6 +203,99 @@ function makeUndirectedEdgeKey(
   return k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`;
 }
 
+const AREA_LAT_STRIP_COUNT = 64;
+
+/**
+ * Bir ilin poligon halkalarını güneyden kuzeye (minY -> maxY) N yatay şeride bölerek
+ * kümülatif yüzey alanı dağılım tablosunu hesaplar (Green teoremi ile tam alan hesabı).
+ */
+function buildProvinceAreaLatTable(
+  rings: [number, number][][],
+  minLat: number,
+  maxLat: number
+): ProvinceAreaLatTable {
+  const n = AREA_LAT_STRIP_COUNT;
+  const cum = new Float64Array(n + 1);
+  if (!Number.isFinite(minLat) || !Number.isFinite(maxLat) || maxLat <= minLat) {
+    for (let k = 0; k <= n; k++) cum[k] = k / n;
+    return { minLat: 36, maxLat: 42, cumAreaFractions: cum };
+  }
+
+  const span = maxLat - minLat;
+  let runningArea = 0;
+
+  for (let k = 0; k < n; k++) {
+    const latA = minLat + (k / n) * span;
+    const latB = minLat + ((k + 1) / n) * span;
+    let stripArea = 0;
+
+    for (const ring of rings) {
+      let signedArea = 0;
+      const len = ring.length;
+      for (let i = 0; i < len; i++) {
+        const [x0, y0] = ring[i];
+        const [x1, y1] = ring[(i + 1) % len];
+        if (y0 === y1) continue;
+        const ya = Math.max(latA, Math.min(latB, y0));
+        const yb = Math.max(latA, Math.min(latB, y1));
+        if (ya === yb) continue;
+        const invDy = 1 / (y1 - y0);
+        const xa = x0 + (x1 - x0) * (ya - y0) * invDy;
+        const xb = x0 + (x1 - x0) * (yb - y0) * invDy;
+        signedArea += 0.5 * (xa + xb) * (yb - ya);
+      }
+      stripArea += Math.abs(signedArea);
+    }
+
+    runningArea += stripArea;
+    cum[k + 1] = runningArea;
+  }
+
+  if (runningArea > 1e-12) {
+    for (let k = 1; k <= n; k++) {
+      cum[k] /= runningArea;
+    }
+    cum[n] = 1.0;
+  } else {
+    for (let k = 0; k <= n; k++) {
+      cum[k] = k / n;
+    }
+  }
+
+  return { minLat, maxLat, cumAreaFractions: cum };
+}
+
+/**
+ * Güneyden kuzeye [0..1] kümülatif alan kesrine karşılık gelen tam enlem (latitude) değerini döndürür.
+ */
+function interpolateLatAtAreaFraction(
+  table: ProvinceAreaLatTable,
+  fraction: number
+): number {
+  const pad = 0.0008;
+  if (fraction <= 0) return table.minLat - pad;
+  if (fraction >= 1) return table.maxLat + pad;
+
+  const cum = table.cumAreaFractions;
+  const n = AREA_LAT_STRIP_COUNT;
+  let lo = 0;
+  let hi = n;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (cum[mid] <= fraction) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+
+  const f0 = cum[lo];
+  const f1 = cum[lo + 1];
+  const localT = f1 > f0 ? (fraction - f0) / (f1 - f0) : 0;
+  const normalizedIdx = (lo + localT) / n;
+  return table.minLat + normalizedIdx * (table.maxLat - table.minLat);
+}
+
 /**
  * 81 il GeoJSON verisinden:
  * 1) Her ilin ana kara parçasının merkezini,
@@ -210,6 +311,7 @@ export function buildProvinceGeometryMeta(
   const polygonParts: ProvincePolygonPart[] = [];
   const outerBorderPaths: [number, number][][] = [];
   const featureByPlate = new Map<number, ProvinceFeature>();
+  const areaLatTableByPlate = new Map<number, ProvinceAreaLatTable>();
 
   if (!provincesGeoJson) {
     return {
@@ -218,6 +320,7 @@ export function buildProvinceGeometryMeta(
       polygonParts,
       outerBorderPaths,
       featureByPlate,
+      areaLatTableByPlate,
     };
   }
 
@@ -333,6 +436,10 @@ export function buildProvinceGeometryMeta(
       rings: rawRings,
       segments,
     });
+    areaLatTableByPlate.set(
+      plate,
+      buildProvinceAreaLatTable(rawRings, minY, maxY)
+    );
   }
 
   const proximityMargin = 0.025;
@@ -423,6 +530,7 @@ export function buildProvinceGeometryMeta(
     polygonParts,
     outerBorderPaths,
     featureByPlate,
+    areaLatTableByPlate,
   };
 }
 
@@ -756,52 +864,22 @@ export const TurkeyMap = memo(function TurkeyMap({
           : 0;
 
       const heightMult = is3D && isHovered ? HOVER_HEIGHT_MULTIPLIER : 1.0;
+      const blockHeightM =
+        filtMw > 0.05 ? Math.max(120, normalBlockHeightM * heightMult) : 0;
 
-      let cumulativeZ = hoverLiftM;
-      let activeSliceIdx = 0;
-      let remainingMw = filtMw;
+      const areaTable = provinceMeta.areaLatTableByPlate.get(plate) ?? {
+        minLat: 36,
+        maxLat: 42,
+        cumAreaFractions: new Float64Array([0, 1]),
+      };
+      const topLatBound = areaTable.maxLat + 0.0008;
+
+      let cumMw = 0;
 
       for (const src of sortedSources) {
         const inFilter = isSourceInFilter(src, activeFilter, sourceLabels);
         const srcMw = inFilter && hourSlice ? (hourSlice.bySource[src] ?? 0) : 0;
 
-        if (!is3D || srcMw <= 0.05) {
-          const [r, g, b] = SOURCE_PALETTE[src].rgb;
-          sliceMetricsMap.set(`${plate}-${src}`, {
-            baseElevationM: cumulativeZ,
-            sliceElevationM: 0,
-            scaleRatio: 1,
-            fillColor: [r, g, b, 0],
-          });
-          continue;
-        }
-
-        let rawSliceH = srcMw * elevationPerMw * heightMult;
-        if (
-          filtMw < LOW_PROVINCE_THRESHOLD_MW &&
-          activeFilter === "all" &&
-          filtMw > 0
-        ) {
-          rawSliceH =
-            (srcMw / filtMw) *
-            Math.max(LOW_PROVINCE_BASE_ELEVATION_M, filtMw * elevationPerMw) *
-            heightMult;
-        }
-
-        // En alttaki en büyük dilim (activeSliceIdx === 0) ilin %100 tam sınırındadır (scaleRatio = 1).
-        // Üstteki dilimler, kalan payın karekökü oranında kademeli teraslanarak 50° kamera açısında
-        // hem yandan hem üstten her kaynağın gerçek payıyla okunmasını sağlar.
-        let scaleRatio = 1.0;
-        if (!isSingleSource && activeSliceIdx > 0 && filtMw > 0) {
-          const remShare = Math.max(0, Math.min(1, remainingMw / filtMw));
-          const maxStepScale = Math.pow(0.84, activeSliceIdx);
-          scaleRatio = Math.max(
-            0.22,
-            Math.min(maxStepScale, Math.sqrt(remShare))
-          );
-        }
-
-        const baseZ = cumulativeZ + activeSliceIdx * 4;
         const rgb = isSingleSource
           ? computeSingleSourceShadeRgb(
               src,
@@ -810,19 +888,41 @@ export const TurkeyMap = memo(function TurkeyMap({
             )
           : computeSliceSourceRgb(src, isHovered);
 
+        if (!is3D || filtMw <= 0.05 || srcMw <= 0.05) {
+          const curFrac =
+            filtMw > 0.05 ? Math.max(0, Math.min(1, cumMw / filtMw)) : 1;
+          const collapseLat =
+            curFrac >= 1
+              ? topLatBound
+              : interpolateLatAtAreaFraction(areaTable, curFrac);
+          sliceMetricsMap.set(`${plate}-${src}`, {
+            baseElevationM: hoverLiftM,
+            sliceElevationM: is3D ? blockHeightM : 0,
+            bandLatBounds: [collapseLat, collapseLat],
+            fillColor: [rgb[0], rgb[1], rgb[2], opacityByte],
+          });
+          continue;
+        }
+
+        const startFrac = Math.max(0, Math.min(1, cumMw / filtMw));
+        cumMw += srcMw;
+        const endFrac = Math.max(0, Math.min(1, cumMw / filtMw));
+
+        const startLat = interpolateLatAtAreaFraction(areaTable, startFrac);
+        const endLat = interpolateLatAtAreaFraction(areaTable, endFrac);
+
         sliceMetricsMap.set(`${plate}-${src}`, {
-          baseElevationM: baseZ,
-          sliceElevationM: Math.max(120, rawSliceH),
-          scaleRatio,
+          baseElevationM: hoverLiftM,
+          sliceElevationM: blockHeightM,
+          bandLatBounds: [startLat, endLat],
           fillColor: [rgb[0], rgb[1], rgb[2], opacityByte],
         });
-
-        remainingMw = Math.max(0, remainingMw - srcMw);
-        cumulativeZ = baseZ + Math.max(120, rawSliceH);
-        activeSliceIdx++;
       }
 
-      blockTopElevationByPlate.set(plate, cumulativeZ);
+      blockTopElevationByPlate.set(
+        plate,
+        is3D && filtMw > 0.05 ? hoverLiftM + blockHeightM : 0
+      );
     }
 
     return {
@@ -839,6 +939,7 @@ export const TurkeyMap = memo(function TurkeyMap({
     };
   }, [
     provinceSeriesByPlate,
+    provinceMeta.areaLatTableByPlate,
     selectedHourIndex,
     activeFilter,
     sourceLabels,
@@ -1061,16 +1162,15 @@ export const TurkeyMap = memo(function TurkeyMap({
         specularColor: [45, 60, 85],
       },
       getPolygon: (d) => d.polygon,
-      getCentroid: (d) => d.centroid,
       getBaseElevation: (d) =>
         renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
           ?.baseElevationM ?? 0,
       getElevation: (d) =>
         renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
           ?.sliceElevationM ?? 0,
-      getScaleRatio: (d) =>
+      getBandLatBounds: (d) =>
         renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
-          ?.scaleRatio ?? 1,
+          ?.bandLatBounds ?? [0, 0],
       getFillColor: (d) =>
         renderComputed.sliceMetricsMap.get(`${d.plate}-${d.source}`)
           ?.fillColor ?? [0, 0, 0, 0],
@@ -1083,7 +1183,7 @@ export const TurkeyMap = memo(function TurkeyMap({
           duration: transitionDurationMs,
           easing: easeCubicOut,
         },
-        getScaleRatio: {
+        getBandLatBounds: {
           duration: transitionDurationMs,
           easing: easeCubicOut,
         },
@@ -1105,7 +1205,7 @@ export const TurkeyMap = memo(function TurkeyMap({
           activeProvincePlate,
           is3D,
         ],
-        getScaleRatio: [
+        getBandLatBounds: [
           selectedHourIndex,
           activeFilter,
           activeProvincePlate,
