@@ -665,6 +665,7 @@ plant_id,location_source,location_id,score,method
 2341,gem,L100000603578,100.0,fuzzy_name
 2343,gem,L100001045956,77.8,fuzzy_name
 2344,osm,way/1508410932,100.0,fuzzy_name
+2345,gem,L100001048326,32.5,fuzzy_name
 2349,gem,L100001048478,100.0,exact_name
 2352,osm,way/1497887387,58.3,fuzzy_name
 2356,osm,way/1518797543,100.0,fuzzy_name
@@ -926,7 +927,7 @@ plant_id,location_source,location_id,score,method
 2913,gem,L100001055935,100.0,fuzzy_name
 2914,gem,L100001048473,100.0,fuzzy_name
 2918,gem,L100001048327,100.0,exact_name
-2930,gem,L100001048326,55.6,fuzzy_name
+2930,gem,L100000831494,100.0,exact_name
 2933,osm,way/905927559,85.0,fuzzy_name
 2935,gem,L100001048412,100.0,exact_name
 2936,gem,L100001048463,80.0,fuzzy_name
