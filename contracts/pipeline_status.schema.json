@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://turkiye-enerji-haritasi.local/contracts/pipeline_status.schema.json",
+  "title": "Veri hattı durumu",
+  "description": "Airflow DAG'larının en son çalışması ve her adımın durumu. scripts/pipeline_status.py yaklaşık 20 saniyede bir üretir; değişiklik yoksa da en geç 2 dakikada bir yeniden yazar (generated_at canlılık sinyalidir).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "pipelines"],
+  "properties": {
+    "schema_version": {
+      "const": "0.2",
+      "description": "Sözleşme sürümü."
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/GeneratedAt",
+      "description": "Dosyanın üretildiği an (+03:00). 5 dakikadan eskiyse izleyici (Docker) çalışmıyor demektir."
+    },
+    "pipelines": {
+      "type": "array",
+      "description": "Her DAG için bir kayıt. Sıra gösterim sırasıdır (önce saatlik, sonra günlük).",
+      "items": { "$ref": "#/$defs/Pipeline" }
+    }
+  },
+  "$defs": {
+    "Pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "schedule_label", "is_paused", "last_success_at", "run", "steps"],
+      "properties": {
+        "id": { "type": "string", "description": "Airflow dag_id (ör. enerji_saatlik)." },
+        "label": { "type": "string", "description": "Türkçe ad." },
+        "schedule_label": { "type": "string", "description": "Zamanlama, Türkçe (ör. \"Her saat :50'de\")." },
+        "is_paused": { "type": "boolean", "description": "DAG duraklatılmış mı (true ise zamanlanmış çalışma olmaz)." },
+        "last_success_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/GeneratedAt" }, { "type": "null" }],
+          "description": "En son başarılı çalışmanın bitiş anı. Hiç yoksa null."
+        },
+        "run": {
+          "anyOf": [{ "$ref": "#/$defs/Run" }, { "type": "null" }],
+          "description": "En son çalışma (sürüyor olabilir). Hiç çalışma yoksa null."
+        },
+        "steps": {
+          "type": "array",
+          "description": "En son çalışmanın adımları, akış sırasıyla. depends_on ile ağaç kurulur.",
+          "items": { "$ref": "#/$defs/Step" }
+        }
+      }
+    },
+    "Run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "trigger", "state", "started_at", "ended_at"],
+      "properties": {
+        "id": { "type": "string", "description": "Airflow run_id." },
+        "trigger": {
+          "enum": ["scheduled", "manual", "other"],
+          "description": "Zamanlanmış mı, elle mi tetiklendi."
+        },
+        "state": {
+          "enum": ["queued", "running", "success", "failed"],
+          "description": "Çalışmanın durumu."
+        },
+        "started_at": { "anyOf": [{ "$ref": "common.schema.json#/$defs/GeneratedAt" }, { "type": "null" }] },
+        "ended_at": { "anyOf": [{ "$ref": "common.schema.json#/$defs/GeneratedAt" }, { "type": "null" }] }
+      }
+    },
+    "Step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "stage", "from", "to", "state", "started_at", "ended_at", "try_number", "depends_on"],
+      "properties": {
+        "id": { "type": "string", "description": "Airflow task_id." },
+        "label": { "type": "string", "description": "Türkçe adım adı." },
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "from": { "type": "string", "description": "Verinin okunduğu yer, Türkçe (ör. \"EPİAŞ Şeffaflık Platformu API\")." },
+        "to": { "type": "string", "description": "Verinin yazıldığı yer, Türkçe (ör. \"BigQuery · epias_raw\")." },
+        "state": { "$ref": "#/$defs/StepState" },
+        "started_at": { "anyOf": [{ "$ref": "common.schema.json#/$defs/GeneratedAt" }, { "type": "null" }] },
+        "ended_at": { "anyOf": [{ "$ref": "common.schema.json#/$defs/GeneratedAt" }, { "type": "null" }] },
+        "try_number": { "type": "integer", "minimum": 0, "description": "Kaçıncı deneme (0 = henüz başlamadı)." },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Bu adımdan önce gelen adımların id'leri (ağacın kenarları)."
+        }
+      }
+    },
+    "Stage": {
+      "enum": ["epias", "bigquery", "dbt", "export", "gcs"],
+      "description": "Adımın katmanı: epias = EPİAŞ'tan çekme, bigquery = BigQuery kontrolü, dbt = dbt modelleri ve testleri, export = JSON dışa aktarma/doğrulama, gcs = kovaya yayın."
+    },
+    "StepState": {
+      "enum": ["pending", "running", "success", "failed", "retrying", "skipped", "upstream_failed"],
+      "description": "pending = sırada/başlamadı, retrying = hata verdi, yeniden denenecek, skipped = yapılacak iş yoktu (normal), upstream_failed = önceki adım başarısız olduğu için çalışmadı."
+    }
+  }
+}

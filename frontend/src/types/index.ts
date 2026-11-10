@@ -5,6 +5,7 @@
 export * from "./common";
 export * from "./generation_24h";
 export * from "./mix_24h";
+export * from "./pipeline_status";
 export * from "./plants";
 export * from "./provinces";
 export * from "./provinces_24h";

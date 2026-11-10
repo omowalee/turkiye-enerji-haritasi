@@ -15,6 +15,7 @@ Sitenin okuduğu JSON dosyalarının şekli `contracts/*.schema.json` (JSON Sche
 | `provinces_24h.json` | `provinces_24h.schema.json` | günlük | 20,3 KB / 6,1 KB |
 | `provinces.geojson` | `provinces.schema.json` | statik | 144,0 KB / 43,1 KB |
 | `source_labels.json` | `source_labels.schema.json` | sözleşmeyle birlikte | 0,7 KB / 0,3 KB |
+| `pipeline_status.json` | `pipeline_status.schema.json` | ~20 sn (Docker açıkken) | ~4 KB / ~1 KB |
 | **Toplam** | | | **487 KB / 100 KB** |
 
 - Ortak tanımlar `contracts/common.schema.json` içindedir.
@@ -220,6 +221,18 @@ Yalnızca üretimi olan iller listededir ve `rank` sırasına dizilidir. Listede
 - Kaynak geoBoundaries TUR ADM1 (CC BY-SA 2.0). Atıf zorunludur.
 - `stg_provinces`'tan BigQuery `ST_SIMPLIFY` (1.000 m) ile sadeleştirilir ve 3 ondalığa yuvarlanır. Sadeleştirmede noktaya inen küçük adalar düşer. İller ayrı ayrı sadeleştirildiği için komşu sınırlarda küçük boşluklar olabilir.
 
+### `pipeline_status.json`
+
+Veri hattının o anki durumu: hangi adım çalışıyor, hangisi bitti, hangisi hata verdi. `scripts/pipeline_status.py` Docker'daki `pipeline-status` servisinde çalışır, Airflow API'sini 20 saniyede bir okur. İçerik değişince ya da en geç 2 dakikada bir dosyayı yeniden yazar. Kovada `Cache-Control: no-cache` ile durur. Diğer dosyalardan bağımsızdır, `snapshot_latest` ile birlikte yayımlanmaz.
+
+- `generated_at` canlılık sinyalidir. **5 dakikadan eskiyse** izleyici çalışmıyordur (Docker kapalı). Bu durumda panel adımları "son bilinen durum" olarak göstermeli.
+- `pipelines[]`: önce `enerji_saatlik`, sonra `enerji_gunluk`. Her birinde `is_paused`, `last_success_at`, `run` (en son çalışma; yoksa `null`) ve `steps[]` alanları var.
+- `steps[]` akış sırasıyla gelir. `depends_on` önceki adımların `id`'leridir, ağaç bu kenarlarla kurulur. Saatlik hat bir karar dalı içerir: `plant_day_check` yeni santral günü yoksa `skipped` olur, santral dalı atlanır. Bu normaldir, hata değildir.
+- `stage`: `epias` (EPİAŞ'tan çekme), `bigquery` (BigQuery'de kontrol/eşleştirme), `dbt` (modeller ve testler), `export` (JSON dışa aktarma, şema doğrulama), `gcs` (kovaya yayın).
+- `from` / `to`: verinin okunduğu ve yazıldığı yer, Türkçe.
+- `state`: `pending` (sırada), `running`, `success`, `failed`, `retrying` (hata verdi, yeniden denenecek), `skipped` (yapılacak iş yoktu), `upstream_failed` (önceki adım düştüğü için çalışmadı).
+- Panel sürelerini `started_at` / `ended_at` alanlarından hesaplar. `try_number` 1'den büyükse kaçıncı deneme olduğunu gösterir.
+
 ## Bilinen sınırlar
 
 Sayılar 2026-11-08 örneğinden (santral günü 2026-11-07). Eşleştirme ayrıntısı: `docs/eslestirme-raporu.md`.
@@ -240,6 +253,7 @@ Sayılar 2026-11-08 örneğinden (santral günü 2026-11-07). Eşleştirme ayrı
 
 | Sürüm | Tarih | Değişiklik |
 |---|---|---|
+| 0.2 | 2026-11-10 | Yalnızca ekleme: yeni dosya `pipeline_status.json` (`pipeline_status.schema.json`), veri hattı durumu. Mevcut dosyalar değişmedi, sürüm aynı |
 | 0.2 | 2026-11-08 | Yalnızca ekleme: `snapshot_latest.live` ve `.plants_day` içinde `consumption_mw`, `net_import_mw`, `balance_mw` (int \| null, opsiyonel ama dışa aktarma hep yazar); `mix_24h.live` ve `.plants_day` içinde aynı adlı, `hours` ile hizalı diziler. Bütün şemalarda ve `source_labels.json` içinde `schema_version` "0.2". Hiçbir alan yeniden adlandırılmadı ya da kaldırılmadı |
 | 0.1 | 2026-11-08 | Örnek veri dbt mart'larından üretiliyor (şekil değişmedi, sürüm aynı). Değer anlamı: `capacity_mw` kurulu güç kuralı, `match.score` güven puanı (eşleşmeyende 0), dbt eşleştirmesi. `plants.schema.json` içinde bu iki alanın açıklaması güncellendi (yalnızca açıklama). `provinces.geojson` BigQuery'de sadeleştiriliyor |
 | 0.1 | 2026-11-08 | İlk taslak (v0), dbt'siz örnek veri. Aynı gün revize edildi: İngilizce kaynak anahtarları ve `source_labels.json`, `schema_version` "0.1", kesinleşmiş saat kuralı ve `live.provisional`, tek doğrulama komutu `scripts.check` |
