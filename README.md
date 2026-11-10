@@ -31,6 +31,7 @@ Veri hattı yerelde Docker (Airflow 3.1, LocalExecutor) ile çalışır; panel G
    docker compose -f docker/docker-compose.yml exec airflow-scheduler airflow dags unpause enerji_saatlik
    ```
 6. **Günlükler:** arayüzde görev → Logs; ya da `docker compose -f docker/docker-compose.yml logs -f airflow-scheduler`.
+6b. **Hat durumu:** `pipeline-status` servisi Airflow'u 20 sn'de bir okuyup `pipeline_status.json`'u kovaya yazar; panel bunu akış ağacı olarak gösterir. Günlük: `docker compose -f docker/docker-compose.yml logs -f pipeline-status`.
 7. **Durdur:** `docker compose -f docker/docker-compose.yml stop` (veri korunur; tekrar `start`/`up -d`).
    **Uyarı:** `down -v` Airflow veritabanını (`enerji-pgdata`) siler; DAG geçmişi ve ayarlar gider. BigQuery verisi etkilenmez.
 

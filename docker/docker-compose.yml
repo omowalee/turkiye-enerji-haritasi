@@ -106,6 +106,18 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  # Panel için veri hattı durumu: Airflow API'sini 20 sn'de bir okur, pipeline_status.json'u kovaya yazar.
+  pipeline-status:
+    <<: *airflow
+    command:
+      - bash
+      - -c
+      - cd /opt/project && exec /opt/project-venv/bin/python -X utf8 -m scripts.pipeline_status --loop 20
+    mem_limit: 256m
+    depends_on:
+      airflow-apiserver:
+        condition: service_healthy
+
 volumes:
   enerji-pgdata:
   enerji-logs:

@@ -75,6 +75,13 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Durum: stack çalışıyor, DAG'lar duraklatılmış.
   - Durum: CORS uygulandı ve doğrulandı. Repo `omowalee/turkiye-enerji-haritasi` push edildi (gitleaks 73 commit temiz). Pages otomatik yayını kapalı (yalnızca `workflow_dispatch`). Bekleyenler (kullanıcı): Pages kaynağı "GitHub Actions" ve `DATA_BASE_URL` değişkeni (kontrol), yayın kararı, DAG'ların açılması.
 
+- 2026-11-10: hat arızası ve durum paneli (veri tarafı):
+  - Arıza: EPİAŞ 10.11 santral listesinden ACIBADEM ESKİŞEHİR'i (pp_id 3213) çıkardı → `fct_generation_hourly` 1378 satır sahipsiz, saatlik hat `dbt_plant` testlerinde durdu (yayın 09.11 17:16'da kaldı). Düzeltme (64fe002): `stg_epias__power_plants` her santralin görüldüğü en son kaydı alır, `is_listed` eklendi. Ayrıca: eşleştirme yeniden üretildi, il tablosu `--full-refresh`, 08.11 santral ve ülke verisi yeniden çekildi (EPİAŞ revizyonu, biyokütle farkı %1,2 idi). Sonra country PASS=57, plant PASS=79; 11:50 saatlik çalışma başarılı, kova güncel.
+  - CORS: `docker/cors.json` içine localhost:5173/4173 eklendi ve uygulandı (16e1dad). Yerelde `frontend/.env.local` → `VITE_DATA_BASE_URL` (git dışı).
+  - Durum paneli: yeni sözleşme dosyası `pipeline_status.json` (0.2, yalnızca ekleme), `scripts/pipeline_status.py`, Docker servisi `pipeline-status` (20 sn, ~57 MB). Kovada `no-cache`. pytest 41/41, scripts.check geçti.
+  - Açık: `enerji_gunluk` 10.11 çalışması kırmızı (düzeltmeden önce düştü; yarın 06:50'de yeniden çalışır). Eşleştirme değişince il tablosu `--full-refresh` istiyor ve bu saatlik hattı durdurabiliyor; kalıcı çözüm henüz yok (karar: kullanıcı).
+  - Sıradaki: Antigravity durum panelini yazar (prompt verildi).
+
 ## Frontend (Antigravity)
 
 - Son güncelleme: 2026-11-08 (commit'leri Claude Code attı)
