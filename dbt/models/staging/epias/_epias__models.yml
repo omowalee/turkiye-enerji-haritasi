@@ -70,8 +70,9 @@ models:
 
   - name: stg_epias__power_plants
     description: >
-      Grain: bir satır = bir EPİAŞ santrali (plant_id), `power_plants` tablosunun EN SON
-      snapshot_date'inden. Koordinat, il ve kurulu güç içermez.
+      Grain: bir satır = bir EPİAŞ santrali (plant_id), `power_plants` tablosunun herhangi bir
+      snapshot'ında görülmüş her santral; santralin en son görüldüğü kayıt. Listeden çıkan santraller
+      kalır (is_listed = false), böylece geçmiş üretimleri sahipsiz kalmaz. Koordinat, il ve kurulu güç içermez.
     columns:
       - name: plant_id
         description: EPİAŞ santral kimliği (pp_id).
@@ -86,7 +87,10 @@ models:
       - name: short_name
         description: EPİAŞ kısa adı.
       - name: snapshot_date
-        description: Listenin alındığı gün.
+        description: Santralin görüldüğü en son liste günü.
+      - name: is_listed
+        description: Santral en son santral listesinde var mı (false = EPİAŞ listeden çıkarmış).
+        data_tests: [not_null]
 
   - name: stg_epias__market_clearing_price
     description: >
