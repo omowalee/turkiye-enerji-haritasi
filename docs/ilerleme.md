@@ -79,8 +79,9 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Arıza: EPİAŞ 10.11 santral listesinden ACIBADEM ESKİŞEHİR'i (pp_id 3213) çıkardı → `fct_generation_hourly` 1378 satır sahipsiz, saatlik hat `dbt_plant` testlerinde durdu (yayın 09.11 17:16'da kaldı). Düzeltme (64fe002): `stg_epias__power_plants` her santralin görüldüğü en son kaydı alır, `is_listed` eklendi. Ayrıca: eşleştirme yeniden üretildi, il tablosu `--full-refresh`, 08.11 santral ve ülke verisi yeniden çekildi (EPİAŞ revizyonu, biyokütle farkı %1,2 idi). Sonra country PASS=57, plant PASS=79; 11:50 saatlik çalışma başarılı, kova güncel.
   - CORS: `docker/cors.json` içine localhost:5173/4173 eklendi ve uygulandı (16e1dad). Yerelde `frontend/.env.local` → `VITE_DATA_BASE_URL` (git dışı).
   - Durum paneli: yeni sözleşme dosyası `pipeline_status.json` (0.2, yalnızca ekleme), `scripts/pipeline_status.py`, Docker servisi `pipeline-status` (20 sn, ~57 MB). Kovada `no-cache`. pytest 41/41, scripts.check geçti.
-  - Açık: `enerji_gunluk` 10.11 çalışması kırmızı (düzeltmeden önce düştü; yarın 06:50'de yeniden çalışır). Eşleştirme değişince il tablosu `--full-refresh` istiyor ve bu saatlik hattı durdurabiliyor; kalıcı çözüm henüz yok (karar: kullanıcı).
-  - Sıradaki: Antigravity durum panelini yazar (prompt verildi).
+  - `enerji_gunluk` kullanıcı tarafından elle tetiklendi (12:15), başarılı; tohum değişikliği cf101d3.
+  - Açık: eşleştirme değişince il tablosu `--full-refresh` istiyor ve bu saatlik hattı durdurabiliyor; kalıcı çözüm henüz yok (karar: kullanıcı).
+  - Durum paneli frontend'de bitti (bb35296). Açık küçük iş: atlanan/çalışmayan adımda süre "0 sn" yerine "—".
 
 ## Frontend (Antigravity)
 
@@ -117,3 +118,4 @@ Frontend'in ihtiyaç duyduğu yeni alanlar buraya yazılır. Veri tarafı şemay
 | 2026-11-08 | frontend: iki modlu oynatma (tag gorsel-v1-kontrol-odasi) | scripts.check: hepsi geçti |
 | 2026-11-08 | frontend: yeni görsel yön + tüketim satırları (312fd55); örnek veri yenilendi (dc8e0a1) | scripts.check: hepsi geçti |
 | 2026-11-08 | frontend: Pages taban yolu ve veri adresi | scripts.check: hepsi geçti; preview alt yolda 404 yok |
+| 2026-11-10 | frontend: hat durumu çekmecesi + il dilimleri alana göre (bb35296); örnek veri yenilendi (0795c5b) | scripts.check: hepsi geçti |
