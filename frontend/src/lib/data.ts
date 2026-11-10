@@ -1,7 +1,6 @@
 import type {
   Generation24H,
   Mix24H,
-  PipelineStatus,
   Plant,
   Plants,
   Provinces,
@@ -16,12 +15,8 @@ import { DEFAULT_SOURCE_ORDER, SOURCE_PALETTE } from "./constants";
  * Tek veri yükleme noktası.
  * VITE_DATA_BASE_URL tanımlıysa oradan (GCS kovası vb.), boşsa yerel örnek veriden (${BASE_URL}data/sample) okunur.
  */
-const rawDataBaseUrl = import.meta.env.VITE_DATA_BASE_URL?.trim();
-
-export const IS_SAMPLE_DATA = !rawDataBaseUrl;
-
-export const DATA_BASE_URL = rawDataBaseUrl
-  ? rawDataBaseUrl.replace(/\/+$/, "")
+export const DATA_BASE_URL = import.meta.env.VITE_DATA_BASE_URL?.trim()
+  ? import.meta.env.VITE_DATA_BASE_URL.trim().replace(/\/+$/, "")
   : `${import.meta.env.BASE_URL}data/sample`;
 
 export type DashboardMode = "live" | "playback";
@@ -441,25 +436,4 @@ function isLocatedPlant(
     Number.isFinite(plant.lat) &&
     Number.isFinite(plant.lon)
   );
-}
-
-/**
- * Veri hattı durumunu (${DATA_BASE_URL}/pipeline_status.json) okur.
- * Dosya yoksa ya da hata verirse null döndürür, panel çökmez.
- */
-export async function loadPipelineStatus(
-  signal?: AbortSignal
-): Promise<PipelineStatus | null> {
-  try {
-    const response = await fetch(`${DATA_BASE_URL}/pipeline_status.json`, {
-      signal,
-      cache: "no-cache",
-    });
-    if (!response.ok) {
-      return null;
-    }
-    return (await response.json()) as PipelineStatus;
-  } catch {
-    return null;
-  }
 }

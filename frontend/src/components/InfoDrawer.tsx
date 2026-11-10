@@ -8,7 +8,6 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { PipelineStatusControl } from "@/components/PipelineStatusDrawer";
 import { Badge } from "@/components/ui/badge";
 import {
   evaluateFreshness,
@@ -110,31 +109,8 @@ export const InfoDrawer = memo(function InfoDrawer({
 
   return (
     <>
-      {/* Sağ Üst: Üst satırda Hat Rozeti + "i" Düğmesi, hemen altında Santral Tarihi ve Tazelik */}
-      <div className="pointer-events-auto fixed top-2.5 right-2.5 z-20 flex flex-col items-end gap-1.5 md:top-4 md:right-4">
-        <div className="flex items-center gap-2">
-          <PipelineStatusControl
-            onOpenChange={(pipelineOpen) => {
-              if (pipelineOpen) setOpen(false);
-            }}
-          />
-
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-label="Veri detayları, konumu bilinmeyen üretim ve atıflar çekmecesini aç"
-            title="Veri bilgileri, konumu bilinmeyen üretim ve atıflar"
-            className={`flex h-10 w-10 items-center justify-center rounded-xl border shadow-xl backdrop-blur-xl transition-all focus-visible:outline-2 focus-visible:outline-[#38BDF8] ${
-              open
-                ? "border-[#38BDF8]/60 bg-[#0A1324]/95 text-[#38BDF8]"
-                : "border-white/12 bg-[#060B14]/82 text-[#F8FAFC] hover:border-white/25 hover:bg-[#0D1628]/90"
-            }`}
-          >
-            <Info className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-
+      {/* Sağ Üst: Santral Tarihi Etiketi + Küçük Tazelik Rozeti + "i" Düğmesi */}
+      <div className="pointer-events-auto fixed top-2.5 right-2.5 z-20 flex items-center gap-2 md:top-4 md:right-4">
         <div className="hidden items-center gap-2 rounded-xl border border-white/12 bg-[#060B14]/78 px-3 py-1.5 text-xs shadow-xl backdrop-blur-xl xl:flex">
           <span className="font-mono-data text-[11px] text-[#94A3B8] tabular-nums">
             Santral verisi:{" "}
@@ -161,6 +137,21 @@ export const InfoDrawer = memo(function InfoDrawer({
             </Badge>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label="Veri detayları, konumu bilinmeyen üretim ve atıflar çekmecesini aç"
+          title="Veri bilgileri, konumu bilinmeyen üretim ve atıflar"
+          className={`flex h-10 w-10 items-center justify-center rounded-xl border shadow-xl backdrop-blur-xl transition-all focus-visible:outline-2 focus-visible:outline-[#38BDF8] ${
+            open
+              ? "border-[#38BDF8]/60 bg-[#0A1324]/95 text-[#38BDF8]"
+              : "border-white/12 bg-[#060B14]/82 text-[#F8FAFC] hover:border-white/25 hover:bg-[#0D1628]/90"
+          }`}
+        >
+          <Info className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
 
       {/* Sağdan Açılan Koyu Cam Bilgi Çekmecesi */}
