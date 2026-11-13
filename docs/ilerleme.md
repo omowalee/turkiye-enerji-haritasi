@@ -83,6 +83,12 @@ Her iki araç da oturum sonunda kendi bölümünü günceller. Kısa yaz: ne yap
   - Açık: eşleştirme değişince il tablosu `--full-refresh` istiyor ve bu saatlik hattı durdurabiliyor; kalıcı çözüm henüz yok (karar: kullanıcı).
   - Durum paneli frontend'de bitti (bb35296). Açık küçük iş: atlanan/çalışmayan adımda süre "0 sn" yerine "—".
 
+- 2026-11-13: il tutarlılık testi ve günlük hat:
+  - Teşhis: `assert_province_agg_matches_current_matching` 54 satır, yalnızca İstanbul ↔ konumsuz, 06–09.11. Neden: 2970 KEMERBURGAZ RES kapasite cezasıyla 100 → 85 (eşik 90), konumsuza düştü. Eşleştirme 30 günlük kayan profil yüzünden günlük değişebiliyor; `dbt_build_match` varsayılan 48 sa ile kurduğu için eski saatler bayat kalıyordu.
+  - Çözüm (69e04c6): `dbt_build_match` artık `lookback_hours: 192` ile kurar (testin 7 günü + santral gecikmesi). Dry-run: il ve fct 23 → 69 MB/kurulum; tam yeniden kurma 735 MB idi. Test daraltılmadı, full-refresh yapılmadı.
+  - Ayrı bulgu: `assert_plant_total_matches_country` 09–10.11'de düştü. Santral günü ertesi sabah bir kez çekiliyor, EPİAŞ ülke ve santral verisini sonradan revize ediyor. 09–10.11 santral ve ülke verisi elle yeniden çekildi; country 62/62, plant 79/79; `enerji_gunluk` tetiklendi, 4 adım yeşil. Kalıcı çözüm açık (karar: kullanıcı): santral günlerini birkaç gün boyunca yeniden çekmek.
+  - Uyarı listeleri `docs/eslestirme-raporu.md` §8'de (9c7bc41).
+
 ## Frontend (Antigravity)
 
 - Son güncelleme: 2026-11-08 (commit'leri Claude Code attı)
