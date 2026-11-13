@@ -8,7 +8,8 @@
 -- Konumu/ili bilinmeyen santraller plate_code NULL, is_unlocated = true satirinda toplanir; boylece saat
 -- toplami santral toplamina esittir. province_key = plate_code, konumsuzda 0 (NULL olmayan anahtar; kume ve testler).
 -- Artimli (insert_overwrite): son var('lookback_hours') saati iceren UTC gunleri bastan yazilir. Eslestirme degisince (seed'ler, int_plants_matched)
--- eski saatlerin ili bayatlar: --full-refresh gerekir (assert_province_agg_matches_current_matching yakalar).
+-- pencere disindaki saatlerin ili bayatlar: enerji_gunluk eslestirmeden sonra 192 saatle yeniden kurar (son 7 gun tutarli;
+-- assert_province_agg_matches_current_matching kontrol eder). Daha eskisi icin --full-refresh.
 with enriched as (
     select hour_start_at_utc, date_tr, plate_code, source_type, generation_mw
     from {{ ref('int_generation_enriched') }}

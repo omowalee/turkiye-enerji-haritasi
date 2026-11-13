@@ -1,6 +1,7 @@
 -- Son 7 günde il x saat toplamı, GÜNCEL eşleştirmeyle (fct_generation_hourly + dim_plants.plate_code)
 -- yeniden hesaplananla aynı olmalı (%0,5 tolerans). Artımlı il tablosu eşleştirme değişikliğinden sonra
--- --full-refresh edilmezse eski saatlerin ili bayat kalır; bu test onu yakalar.
+-- bu pencereyi kapsayan lookback ile yeniden kurulmazsa eski saatlerin ili bayat kalır; bu test onu yakalar.
+-- Pencere enerji_gunluk.MATCH_LOOKBACK_HOURS ile birlikte değişmeli.
 -- Dönen satırlar: farkı olan saat x il (province_key 0 = konumsuz).
 with agg as (
     select hour_start_at_utc, province_key, sum(generation_mw) as agg_mw
