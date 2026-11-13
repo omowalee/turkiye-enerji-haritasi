@@ -25,13 +25,13 @@ plant_id,location_source,location_id,score,method
 697,osm,way/216513642,100.0,fuzzy_name
 700,gem,L100000103640,62.5,fuzzy_name
 702,gem,L100000831312,85.0,fuzzy_name
-705,gem,L100000103688,100.0,exact_name
 706,gem,L100000103700,100.0,exact_name
 708,gem,L100000103701,100.0,exact_name
 709,gem,L100000603588,77.8,fuzzy_name
 710,osm,way/252909449,100.0,exact_name
 712,gem,L100000103634,100.0,fuzzy_name
 714,gem,L100000603612,100.0,exact_name
+715,gem,L100001045956,100.0,exact_name
 716,gem,L100001045949,100.0,exact_name
 717,gem,L100001048468,100.0,exact_name
 719,osm,way/130576634,66.7,fuzzy_name
@@ -129,7 +129,7 @@ plant_id,location_source,location_id,score,method
 989,osm,way/99939431,100.0,exact_name
 990,gem,L100000603657,100.0,exact_name
 991,gem,L100001045927,100.0,exact_name
-992,gem,L100001064178,100.0,exact_name
+992,osm,way/363552363,100.0,exact_name
 993,osm,way/170137726,100.0,fuzzy_name
 994,osm,way/170137726,100.0,fuzzy_name
 995,osm,way/395801038,100.0,exact_name
@@ -142,6 +142,7 @@ plant_id,location_source,location_id,score,method
 1004,gem,L100000603653,100.0,exact_name
 1005,gem,L100000603626,100.0,exact_name
 1006,osm,way/90974845,100.0,exact_name
+1014,osm,way/179295394,63.2,fuzzy_name
 1017,osm,way/393404227,100.0,exact_name
 1022,osm,way/690664843,100.0,exact_name
 1029,gem,L100001045939,100.0,exact_name
@@ -197,6 +198,7 @@ plant_id,location_source,location_id,score,method
 1194,gem,L100000921487,100.0,exact_name
 1198,gem,L100000603652,100.0,exact_name
 1199,gem,L100000408849,75.0,fuzzy_name
+1200,osm,way/128629171,72.7,fuzzy_name
 1201,osm,way/621781316,75.0,fuzzy_name
 1202,osm,way/395738609,58.8,fuzzy_name
 1211,osm,way/785705108,54.5,fuzzy_name
@@ -209,7 +211,6 @@ plant_id,location_source,location_id,score,method
 1226,osm,way/303748870,100.0,exact_name
 1229,osm,way/229782465,61.5,fuzzy_name
 1230,gem,L100000405892,100.0,exact_name
-1237,osm,way/363552363,55.6,fuzzy_name
 1241,osm,way/91364192,100.0,fuzzy_name
 1242,gem,L100000408850,70.0,fuzzy_name
 1249,osm,way/292050980,70.0,fuzzy_name
@@ -296,13 +297,13 @@ plant_id,location_source,location_id,score,method
 1477,gem,L100001061762,100.0,exact_name
 1478,osm,way/900686038,40.0,fuzzy_name
 1484,gem,L100000921479,100.0,exact_name
-1485,osm,relation/13735697,66.7,fuzzy_name
+1485,gem,L100000921491,100.0,fuzzy_name
 1487,osm,relation/14577618,100.0,exact_name
 1488,osm,relation/14577642,100.0,fuzzy_name
 1489,osm,relation/14577624,100.0,exact_name
 1490,gem,L100000921572,85.0,fuzzy_name
 1491,osm,way/1096301810,100.0,exact_name
-1492,gem,L100000921491,100.0,exact_name
+1492,osm,relation/14577656,100.0,exact_name
 1494,osm,relation/12308952,100.0,fuzzy_name
 1498,osm,relation/17591750,100.0,exact_name
 1499,osm,relation/14577657,100.0,fuzzy_name
@@ -465,7 +466,7 @@ plant_id,location_source,location_id,score,method
 1905,gem,L100000603634,100.0,exact_name
 1908,osm,way/783393014,100.0,exact_name
 1910,gem,L100000921605,64.5,fuzzy_name
-1915,osm,relation/14577661,100.0,exact_name
+1915,gem,L100000921510,100.0,exact_name
 1917,gem,L100001064241,60.0,fuzzy_name
 1920,gem,L100000921701,100.0,exact_name
 1923,gem,L100000603595,100.0,exact_name
@@ -580,7 +581,6 @@ plant_id,location_source,location_id,score,method
 2168,gem,L100001045954,100.0,exact_name
 2170,gem,L100000405932,70.0,fuzzy_name
 2171,osm,way/1368028513,45.0,fuzzy_name
-2172,osm,way/176767351,66.7,fuzzy_name
 2173,osm,way/190296955,71.4,fuzzy_name
 2174,gem,L100000405924,100.0,exact_name
 2176,osm,way/972927237,100.0,exact_name
@@ -663,7 +663,7 @@ plant_id,location_source,location_id,score,method
 2337,gem,L100000700244,100.0,fuzzy_name
 2338,gem,L100000921498,100.0,exact_name
 2341,gem,L100000603578,100.0,fuzzy_name
-2343,gem,L100001045956,77.8,fuzzy_name
+2343,osm,way/176767351,77.8,fuzzy_name
 2344,osm,way/1508410932,100.0,fuzzy_name
 2345,gem,L100001048326,32.5,fuzzy_name
 2349,gem,L100001048478,100.0,exact_name
@@ -748,7 +748,6 @@ plant_id,location_source,location_id,score,method
 2537,osm,way/788280037,100.0,exact_name
 2538,gem,L100000921626,100.0,exact_name
 2539,gem,L100000831214,100.0,exact_name
-2541,osm,way/128629171,100.0,fuzzy_name
 2543,osm,way/551970288,100.0,exact_name
 2545,gem,L100000921432,85.0,fuzzy_name
 2548,osm,way/995456042,48.3,fuzzy_name
@@ -944,7 +943,7 @@ plant_id,location_source,location_id,score,method
 2965,osm,way/1223383379,100.0,fuzzy_name
 2966,gem,L100000831499,100.0,exact_name
 2967,gem,L100001048471,100.0,exact_name
-2970,gem,L100000921599,100.0,exact_name
+2970,gem,L100000921599,85.0,fuzzy_name
 2971,osm,way/782211168,100.0,fuzzy_name
 2972,osm,way/1534202439,100.0,exact_name
 2976,gem,L100000103596,100.0,fuzzy_name
@@ -1088,3 +1087,5 @@ plant_id,location_source,location_id,score,method
 3222,gem,L100000831270,57.7,fuzzy_name
 3223,osm,way/982030334,58.1,fuzzy_name
 3224,gem,L100000831409,70.0,fuzzy_name
+3226,osm,relation/12275554,48.3,fuzzy_name
+3228,gem,L100000921531,50.0,fuzzy_name
