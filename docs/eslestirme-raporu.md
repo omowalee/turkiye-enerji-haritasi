@@ -128,3 +128,36 @@ PASS=42, WARN=2, ERROR=0.
 
 - `installed_capacity_mw` konum kaydının kapasitesidir. Paylaşılan konumlarda (ZETES 1-3: 2.790 MW, Karapınar: 1.350 MW) tesis toplamını, vekil kayıtlarda (TÜPRAŞ) alakasız bir değeri gösterir. Mart'ta santral kapasitesi olarak gösterilmeden önce karar gerekir.
 - Bulanık eşleştirme `int_plant_profile` değiştikçe (yeni santral, aile değişimi) yeniden çalıştırılmalı: `python -m scripts.match_plants` → `dbt build --select plant_match_candidates+`. Bu adım henüz Airflow'a bağlı değil.
+
+## 8. Uyarı listesi (2026-11-13)
+
+`dbt build --select plant_match_candidates+ int_plant_profile+` (lookback 192 sa): PASS=90, WARN=2, ERROR=0. İki uyarı testinin satırları aşağıda. Hepsi elle düzeltme (`override`). Düzeltme yapılmadı, yalnızca listelendi.
+
+### `warn_capacity_implausible` (10 satır)
+
+30 günün en yüksek saatlik üretimi, konum kaydının kurulu gücünün 1,3 katını aşıyor.
+
+| plant_id | Santral | Kaynak · konum | Kurulu güç (MW) | En yüksek saatlik (MW) | Oran |
+|---|---|---|---|---|---|
+| 867 | TÜPRAŞ İZMİT | gem · L100001077552 | 5,7 | 147,5 | 25,9 |
+| 2421 | TÜPRAŞ İZMİR | gem · L100001077551 | 1,2 | 55,5 | 46,3 |
+| 2159 | AİRRES-4 | gem · L100000921428 | 61,0 | 132,1 | 2,2 |
+| 1760 | SİLİVRİ RES | osm · relation/14577635 | 63,0 | 113,0 | 1,8 |
+| 1473 | MAREN JES | gem · L100001045039 | 24,8 | 40,0 | 1,6 |
+| 2711 | SOĞANLI RES | osm · relation/17564704 | 61,5 | 99,1 | 1,6 |
+| 3132 | UYGAR RES | gem · L100000921721 | 163,0 | 247,7 | 1,5 |
+| 2448 | HASANOBA RES | gem · L100000921566 | 51,0 | 75,1 | 1,5 |
+| 2030 | KURTKAYASI RES | gem · L100000921621 | 46,0 | 68,3 | 1,5 |
+| 2588 | EVRENCİK RES | gem · L100000921528 | 120,0 | 170,1 | 1,4 |
+
+### `warn_shared_location_dissimilar_names` (5 satır)
+
+Aynı konumu kullanan ve adları ünite ekleri dışında benzemeyen santral çiftleri.
+
+| Kaynak · konum | Santral A | Santral B |
+|---|---|---|
+| gem · L100001045001 | 1927 KEN KİPAŞ JES | 2126 KEN-3 JES |
+| gem · L100001045039 | 1473 MAREN JES | 2127 MEHMETHAN JES |
+| gem · L100000831378 | 2579 KARAPINAR YEKA-1 GES | 3214 G24-KARAPINAR GES |
+| gem · L100000831378 | 2579 KARAPINAR YEKA-1 GES | 2798 KARAPINAR YEKA-1 MEKE GES |
+| gem · L100000831378 | 2798 KARAPINAR YEKA-1 MEKE GES | 3214 G24-KARAPINAR GES |
